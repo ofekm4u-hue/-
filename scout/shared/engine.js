@@ -673,14 +673,20 @@
 
     function currentPersona() {
       const stored = ScoutDB.get('currentPersona', null);
-      const def = { name: 'אורח דמו', role: 'national', roleLabel: ROLE_LABELS['national'] };
+      const def = { name: 'אורח דמו', role: 'national', roleLabel: ROLE_LABELS['national'], staffId: null };
       const p = stored || def;
       p.roleLabel = ROLE_LABELS[p.role] || p.role;
+      if (p.staffId === undefined) p.staffId = null;
       return p;
     }
     function setPersona(p) {
       const role = p.role;
-      ScoutDB.set('currentPersona', { name: p.name || 'משתמש', role, roleLabel: ROLE_LABELS[role] });
+      ScoutDB.set('currentPersona', {
+        name: p.name || 'משתמש',
+        role,
+        roleLabel: ROLE_LABELS[role],
+        staffId: p.staffId || null,
+      });
     }
 
     function header({ title, subtitle, persona, showArm = true }) {
@@ -837,14 +843,14 @@
   // ---------- Auth ----------
 
   const Auth = (function () {
-    // Demo credentials: username → { role, name, password }
+    // Demo credentials: username → { role, name, password, staffId }
     const CREDENTIALS = {
       'national': { role: 'national',     name: 'אורי שדה — מנהל ארצי', password: '1234' },
-      'kabat':    { role: 'kabat',        name: 'קב״ט ניר אלון',         password: '1234' },
-      'operator': { role: 'hq-op',        name: 'תורן עידו',              password: '1234' },
-      'guard':    { role: 'guard',        name: 'מאבטח אופיר',           password: '1234' },
+      'kabat':    { role: 'kabat',        name: 'קב״ט ניר אלון',         password: '1234', staffId: 's1' },
+      'operator': { role: 'hq-op',        name: 'תורן עידו',              password: '1234', staffId: 's4' },
+      'guard':    { role: 'guard',        name: 'מאבטח אופיר',           password: '1234', staffId: 's8' },
       'tribe':    { role: 'tribe',        name: 'מרכז שבט נחל',           password: '1234' },
-      'clinic':   { role: 'clinic-chief', name: 'ד״ר נועה לוי',           password: '1234' },
+      'clinic':   { role: 'clinic-chief', name: 'ד״ר נועה לוי',           password: '1234', staffId: 's5' },
     };
 
     const ROUTES = {
@@ -861,7 +867,7 @@
       const cred = CREDENTIALS[u];
       if (!cred) return { ok: false, error: 'שם משתמש לא קיים במערכת' };
       if (cred.password !== password) return { ok: false, error: 'סיסמה שגויה' };
-      UI.setPersona({ name: cred.name, role: cred.role });
+      UI.setPersona({ name: cred.name, role: cred.role, staffId: cred.staffId });
       ScoutDB.set('loggedIn', true);
       ScoutDB.set('loginTs', nowMs());
       ScoutDB.set('loginUser', u);
@@ -971,32 +977,52 @@
     ];
 
     function ensureSeed() {
-      if (ScoutDB.get('chatSeeded', false)) return;
-      const t = nowMs();
-      const seed = {
-        emergency: [
-          { from: 'מערכת', role: 'system', text: '🔒 ערוץ נעול — רק חמ"ל/קב"ט יכולים להפיץ הנחיות.', ts: t - 1000 * 60 * 90 },
-          { from: 'קב״ט ניר אלון', role: 'kabat', text: 'סבב פתיחה הסתיים. כל הצוותים בעמדה. ערנות מלאה.', ts: t - 1000 * 60 * 70 },
-        ],
-        security: [
-          { from: 'אחמ״ש יוסי גולן', role: 'achmash', text: 'סיור 1 התחיל מסלול דרום.', ts: t - 1000 * 60 * 22 },
-          { from: 'מאבטח אופיר',     role: 'guard',   text: 'שער ראשי תקין. 0 חריגים בשעה האחרונה.', ts: t - 1000 * 60 * 18 },
-          { from: 'סייר 3 — תומר',   role: 'patrol',  text: 'גדר היקפית — סבב הושלם. הכל תקין.', ts: t - 1000 * 60 * 8 },
-        ],
-        management: [
-          { from: 'מנהל מחנה גלית', role: 'camp-director', text: 'תזכורת — סבב אכילה ב-19:00. אקונומיה מוכן?', ts: t - 1000 * 60 * 35 },
-          { from: 'אקונומיה',        role: 'staff',         text: 'כן. סבב חלוקה מתחיל ב-18:30.', ts: t - 1000 * 60 * 28 },
-        ],
-      };
-      ScoutDB.set('chats', seed);
-      ScoutDB.set('chatSeeded', true);
+      if (!ScoutDB.get('chatSeeded', false)) {
+        const t = nowMs();
+        const seed = {
+          emergency: [
+            { from: 'מערכת', role: 'system', text: '🔒 ערוץ נעול — רק חמ"ל/קב"ט יכולים להפיץ הנחיות.', ts: t - 1000 * 60 * 90 },
+            { from: 'קב״ט ניר אלון', role: 'kabat', text: 'סבב פתיחה הסתיים. כל הצוותים בעמדה. ערנות מלאה.', ts: t - 1000 * 60 * 70 },
+          ],
+          security: [
+            { from: 'אחמ״ש יוסי גולן', role: 'achmash', text: 'סיור 1 התחיל מסלול דרום.', ts: t - 1000 * 60 * 22 },
+            { from: 'מאבטח אופיר',     role: 'guard',   text: 'שער ראשי תקין. 0 חריגים בשעה האחרונה.', ts: t - 1000 * 60 * 18 },
+            { from: 'סייר 3 — תומר',   role: 'patrol',  text: 'גדר היקפית — סבב הושלם. הכל תקין.', ts: t - 1000 * 60 * 8 },
+          ],
+          management: [
+            { from: 'מנהל מחנה גלית', role: 'camp-director', text: 'תזכורת — סבב אכילה ב-19:00. אקונומיה מוכן?', ts: t - 1000 * 60 * 35 },
+            { from: 'אקונומיה',        role: 'staff',         text: 'כן. סבב חלוקה מתחיל ב-18:30.', ts: t - 1000 * 60 * 28 },
+          ],
+        };
+        ScoutDB.set('chats', seed);
+        ScoutDB.set('chatSeeded', true);
+      }
+      if (!ScoutDB.get('customChannels', null)) ScoutDB.set('customChannels', []);
+      if (!ScoutDB.get('dmChannels', null)) ScoutDB.set('dmChannels', []);
     }
     ensureSeed();
 
     function channels() { return CHANNELS; }
-    function visibleChannels(role) {
-      return CHANNELS.filter(c => c.roles.includes(role));
+
+    function visibleChannels(role, staffId) {
+      const stat = CHANNELS.filter(c => c.roles.includes(role));
+      const custom = (ScoutDB.get('customChannels', []) || [])
+        .filter(c => !staffId || c.members.includes(staffId) || c.createdBy === staffId);
+      const staff = ScoutDB.get('staff', []) || [];
+      const dms = (ScoutDB.get('dmChannels', []) || [])
+        .filter(c => !staffId || c.participants.includes(staffId))
+        .map(c => {
+          const otherId = c.participants.find(p => p !== staffId) || c.participants[0];
+          const other = staff.find(s => s.id === otherId);
+          return Object.assign({}, c, {
+            name: other ? other.name : 'DM',
+            otherRole: other ? other.role : null,
+            isDM: true,
+          });
+        });
+      return stat.concat(custom).concat(dms);
     }
+
     function messages(channelId) {
       return ScoutDB.get('chats', {})[channelId] || [];
     }
@@ -1006,7 +1032,6 @@
       const p = UI.currentPersona();
       const msg = { from: p.name, role: p.role, text: String(text || '').slice(0, 500), ts: nowMs() };
       all[channelId].push(msg);
-      // soft cap per channel
       if (all[channelId].length > 200) all[channelId] = all[channelId].slice(-200);
       ScoutDB.set('chats', all);
       Bus.emit('chat:new', { channelId, msg });
@@ -1017,7 +1042,57 @@
       Bus.emit('bus:broadcast', { text, from: UI.currentPersona().name, ts: nowMs() });
       ScoutDB.appendAudit({ action: 'BROADCAST', channel: 'comms', details: text });
     }
-    return { channels, visibleChannels, messages, send, broadcast };
+
+    function createGroup(name, memberIds, createdBy) {
+      const id = 'grp-' + uuid().slice(0, 8);
+      const grp = {
+        id, name, members: memberIds || [], createdBy: createdBy || null,
+        createdAt: nowMs(), custom: true, locked: false, roles: [],
+      };
+      ScoutDB.patch('customChannels', l => (l || []).concat([grp]));
+      // Seed welcome message
+      const all = ScoutDB.get('chats', {});
+      all[id] = [{
+        from: 'מערכת', role: 'system',
+        text: `📢 הקבוצה "${name}" נוצרה. ${(memberIds || []).length} חברים צורפו.`,
+        ts: nowMs(),
+      }];
+      ScoutDB.set('chats', all);
+      ScoutDB.appendAudit({ action: 'CHAT-GROUP-CREATE', channel: 'comms', details: `${name} (${(memberIds || []).length} חברים)` });
+      Bus.emit('chat:groups-updated', grp);
+      return grp;
+    }
+
+    function openDM(myStaffId, otherStaffId) {
+      const sorted = [myStaffId, otherStaffId].sort();
+      const id = `dm-${sorted[0]}-${sorted[1]}`;
+      const dms = ScoutDB.get('dmChannels', []) || [];
+      let dm = dms.find(d => d.id === id);
+      if (!dm) {
+        dm = { id, participants: sorted, createdAt: nowMs(), isDM: true };
+        ScoutDB.patch('dmChannels', l => (l || []).concat([dm]));
+        ScoutDB.appendAudit({ action: 'CHAT-DM-OPEN', channel: 'comms', details: id });
+        Bus.emit('chat:groups-updated', dm);
+      }
+      return dm;
+    }
+
+    function deleteChannel(channelId) {
+      if (channelId.startsWith('grp-')) {
+        ScoutDB.patch('customChannels', l => (l || []).filter(c => c.id !== channelId));
+      } else if (channelId.startsWith('dm-')) {
+        ScoutDB.patch('dmChannels', l => (l || []).filter(c => c.id !== channelId));
+      } else {
+        return;
+      }
+      const all = ScoutDB.get('chats', {});
+      delete all[channelId];
+      ScoutDB.set('chats', all);
+      ScoutDB.appendAudit({ action: 'CHAT-DELETE', channel: 'comms', details: channelId });
+      Bus.emit('chat:groups-updated', { deleted: channelId });
+    }
+
+    return { channels, visibleChannels, messages, send, broadcast, createGroup, openDM, deleteChannel };
   })();
 
   // ---------- Personnel device telemetry (mock) ----------
