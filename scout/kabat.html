@@ -500,9 +500,9 @@
   /* ===== Chat tab ===== */
   .chat-wrap {
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 280px 1fr;
     gap: 0;
-    height: 580px;
+    height: 620px;
     background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
@@ -510,12 +510,158 @@
   }
   @media (max-width: 800px) {
     .chat-wrap { grid-template-columns: 1fr; height: auto; }
-    .chat-channels { max-height: 200px; }
+    .chat-side { max-height: 280px; }
+  }
+  .chat-side {
+    background: var(--bg-elev);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+  }
+  .chat-side-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg-deep);
+  }
+  .chat-side-tab {
+    padding: 12px 8px;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--text-mid);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--t-fast);
+  }
+  .chat-side-tab:hover { color: var(--text-hi); background: var(--bg-elev); }
+  .chat-side-tab.is-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--bg-elev);
+  }
+  .chat-side-list {
+    overflow-y: auto;
   }
   .chat-channels {
     background: var(--bg-elev);
     border-left: 1px solid var(--border);
     overflow-y: auto;
+  }
+  .contact-group-head {
+    padding: 8px 14px 4px;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-low);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .contact-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .contact-row:hover { background: var(--bg-elev-2); }
+  .contact-row .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--bg-deep);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .contact-row .meta {
+    font-size: 11px; color: var(--text-mid);
+    display: flex; align-items: center; gap: 4px; margin-top: 2px;
+  }
+  .contact-row .dm-btn {
+    padding: 4px 10px; font-size: 11px;
+    background: var(--accent); color: #06121A;
+    border: 0; border-radius: var(--r-pill);
+    cursor: pointer; font-weight: 700;
+  }
+  .contact-row.is-offline .avatar { opacity: 0.45; }
+  .contact-row.is-offline .dm-btn { opacity: 0.5; background: var(--bg-elev); color: var(--text-mid); }
+  .channel.is-custom .ch-name::before { content: '👥 '; }
+  .channel.is-dm .ch-name::before { content: '🗨 '; }
+  .channel .ch-actions {
+    margin-top: 4px;
+    display: flex; gap: 4px;
+  }
+  .channel .ch-del {
+    font-size: 10px; padding: 1px 6px;
+    background: rgba(255,71,87,0.1); color: var(--danger);
+    border: 1px solid rgba(255,71,87,0.3);
+    border-radius: var(--r-pill);
+    cursor: pointer;
+  }
+  .chat-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-ui);
+    font-weight: 700;
+    background: var(--bg-elev);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-thread {
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* Form modal (for gates) */
+  .form-field {
+    margin-bottom: 12px;
+  }
+  .form-field label {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    margin-bottom: 5px;
+  }
+  .checkbox-list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg-deep);
+    padding: 6px;
+  }
+  .checkbox-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    padding: 8px 10px;
+    align-items: center;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+  }
+  .checkbox-row:last-child { border-bottom: 0; }
+  .checkbox-row:hover { background: var(--bg-elev); }
+  .checkbox-row input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+  .gates-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .gates-toolbar h2 { font-family: var(--font-ui); font-size: 16px; }
+  .chip.chip--kabat {
+    color: var(--info);
+    background: rgba(91,141,239,0.18);
+    border-color: transparent;
+    font-weight: 700;
   }
   .channel {
     padding: 14px 16px;
@@ -910,8 +1056,19 @@
     <!-- ============================================================ -->
     <section class="tab-pane" data-pane="chat">
       <div class="chat-wrap">
-        <aside class="chat-channels" id="chat-channels"></aside>
+        <aside class="chat-side">
+          <div class="chat-side-tabs">
+            <button class="chat-side-tab is-active" data-side-tab="channels">💬 ערוצים</button>
+            <button class="chat-side-tab" data-side-tab="contacts">👥 אנשי קשר</button>
+          </div>
+          <div style="padding: 8px;">
+            <button class="btn btn--primary btn--block btn--sm" id="btn-create-group">+ צור קבוצה חדשה</button>
+          </div>
+          <div class="chat-side-list" data-side-pane="channels" id="chat-channels-list"></div>
+          <div class="chat-side-list" data-side-pane="contacts" id="chat-contacts-list" hidden></div>
+        </aside>
         <div class="chat-thread">
+          <div class="chat-header" id="chat-header"></div>
           <div class="chat-messages" id="chat-messages"></div>
           <form class="chat-compose" id="chat-compose">
             <input class="input" name="msg" placeholder="הקלד הודעה..." autocomplete="off">
@@ -1170,13 +1327,20 @@
 
     // Suppliers
     document.getElementById('gp-suppliers').innerHTML = `
+      <div class="gates-toolbar">
+        <h2>🚚 רכבי ספקים מאושרים</h2>
+        <span class="chip">${(ScoutDB.get('vehicles', []) || []).length} רכבים</span>
+        <span style="flex:1"></span>
+        <button class="btn btn--sm btn--primary" data-action="add-supplier">+ הוסף ספק מאושר</button>
+      </div>
       <table class="table">
-        <thead><tr><th>מספר רכב</th><th>נהג</th><th>ספק</th><th>סטטוס</th><th></th></tr></thead>
+        <thead><tr><th>מספר רכב</th><th>נהג</th><th>ספק / מחלקה</th><th>טלפון</th><th>סטטוס</th><th></th></tr></thead>
         <tbody>${(ScoutDB.get('vehicles', []) || []).map(v => `
           <tr>
             <td style="font-family: var(--font-mono); color: var(--accent); font-weight:700;">${util.escapeHtml(v.plate)}</td>
             <td>${util.escapeHtml(v.driver)}</td>
-            <td>${util.escapeHtml(v.vendor)}</td>
+            <td>${util.escapeHtml(v.vendor)}${v.addedByKabat ? ' <span class="chip chip--kabat">הוסף ע״י קב״ט</span>' : ''}</td>
+            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(v.phone || '—')}</td>
             <td>${v.arrived ? '<span class="chip chip--info">בתוך המחנה</span>' : '<span class="chip chip--ok">מאושר לכניסה</span>'}</td>
             <td><button class="btn btn--sm btn--danger" data-veh-remove="${v.id}">הסר</button></td>
           </tr>
@@ -1188,16 +1352,23 @@
     const tribes = ScoutDB.get('tribes', []);
     const busLabels = { planned: 'מתוכנן', waiting: 'בחניון המתנה', cleared: 'מאושר לכניסה', inside: 'בתוך המחנה', left: 'עזב' };
     document.getElementById('gp-buses').innerHTML = `
+      <div class="gates-toolbar">
+        <h2>🚌 לוח אוטובוסים והיסעים</h2>
+        <span class="chip">${(ScoutDB.get('buses', []) || []).length} אוטובוסים</span>
+        <span style="flex:1"></span>
+        <button class="btn btn--sm btn--primary" data-action="add-bus">+ הקם אוטובוס מאושר</button>
+      </div>
       <table class="table">
-        <thead><tr><th>מס׳ רישוי</th><th>שבט / גדוד</th><th>נהג</th><th>חניכים</th><th>סטטוס</th><th></th></tr></thead>
+        <thead><tr><th>מס׳ רישוי</th><th>שבט / גדוד</th><th>נהג / מלווה</th><th>חניכים</th><th>סטטוס</th><th></th></tr></thead>
         <tbody>${(ScoutDB.get('buses', []) || []).map(b => {
           const t = tribes.find(tr => tr.id === b.tribeId);
+          const tName = t ? t.name : (b.tribeName || '—');
           return `
           <tr>
             <td style="font-family: var(--font-mono); color: var(--accent);">${util.escapeHtml(b.plate)}</td>
-            <td>שבט ${util.escapeHtml(t ? t.name : '—')} · ${util.escapeHtml(b.battalion)}</td>
-            <td>${util.escapeHtml(b.driver)}</td>
-            <td>${b.hanichim}</td>
+            <td>שבט ${util.escapeHtml(tName)} · ${util.escapeHtml(b.battalion || '')}${b.addedByKabat ? ' <span class="chip chip--kabat">קב״ט</span>' : ''}</td>
+            <td>${util.escapeHtml(b.driver || '—')}${b.escort ? ' · מלווה: ' + util.escapeHtml(b.escort) : ''}</td>
+            <td>${b.hanichim || 0}</td>
             <td><span class="chip">${busLabels[b.status] || b.status}</span></td>
             <td>
               ${b.status === 'waiting' ? `<button class="btn btn--ok btn--sm" data-bus-clear="${b.id}">אשר כניסה</button>` :
@@ -1210,14 +1381,24 @@
 
     // Staff
     document.getElementById('gp-staff').innerHTML = `
+      <div class="gates-toolbar">
+        <h2>👤 סגל, הנהגה ואורחים</h2>
+        <span class="chip">${(ScoutDB.get('staff', []) || []).length} פעילים</span>
+        <span style="flex:1"></span>
+        <button class="btn btn--sm btn--primary" data-action="add-guest">+ הנפק היתר כניסה לאורח</button>
+      </div>
       <table class="table">
-        <thead><tr><th>שם</th><th>תפקיד</th><th>סטטוס</th></tr></thead>
+        <thead><tr><th>שם</th><th>תפקיד / שיוך</th><th>רכב</th><th>סטטוס</th></tr></thead>
         <tbody>${(ScoutDB.get('staff', []) || []).map(s => `
           <tr>
             <td><strong>${util.escapeHtml(s.name)}</strong></td>
-            <td>${UI.ROLE_LABELS[s.role] || s.role}</td>
-            <td><span class="chip ${s.active ? 'chip--ok' : 'chip--danger'}">${s.active ? 'פעיל' : 'חסום'}</span>
-              ${s.emergency ? ' <span class="chip chip--warn">חירום</span>' : ''}</td>
+            <td>${util.escapeHtml(s.affiliation || UI.ROLE_LABELS[s.role] || s.role)}</td>
+            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(s.plate || '—')}</td>
+            <td>
+              ${s.guestPass ? '<span class="chip chip--kabat">🔷 אורח בתיאום קב״ט</span>' :
+                `<span class="chip ${s.active ? 'chip--ok' : 'chip--danger'}">${s.active ? 'פעיל' : 'חסום'}</span>`}
+              ${s.emergency ? ' <span class="chip chip--warn">חירום</span>' : ''}
+            </td>
           </tr>
         `).join('')}</tbody>
       </table>
@@ -1274,7 +1455,174 @@
       Toast.show('הוסר מהרשימה השחורה.', { kind: 'warn' });
       renderGates(); renderKpis();
     }
+    // Manual gate population
+    if (t.dataset.action === 'add-supplier') openAddSupplierModal();
+    if (t.dataset.action === 'add-bus')      openAddBusModal();
+    if (t.dataset.action === 'add-guest')    openAddGuestModal();
   });
+
+  // ===== Form modal helper =====
+  function openFormModal({ title, subtitle, fields, submitLabel, onSubmit }) {
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    const fieldsHtml = fields.map(f => {
+      if (f.type === 'select') {
+        return `
+          <div class="form-field">
+            <label>${util.escapeHtml(f.label)}${f.required ? ' *' : ''}</label>
+            <select class="select" name="${f.name}" ${f.required ? 'required' : ''}>
+              ${(f.options || []).map(o => `<option value="${util.escapeHtml(o.value)}">${util.escapeHtml(o.label)}</option>`).join('')}
+            </select>
+          </div>`;
+      }
+      return `
+        <div class="form-field">
+          <label>${util.escapeHtml(f.label)}${f.required ? ' *' : ''}</label>
+          <input class="input" type="${f.type || 'text'}" name="${f.name}"
+                 ${f.required ? 'required' : ''}
+                 ${f.placeholder ? `placeholder="${util.escapeHtml(f.placeholder)}"` : ''}>
+        </div>`;
+    }).join('');
+    host.innerHTML = `
+      <form class="modal" style="width: min(560px, 92vw);">
+        <h3>${util.escapeHtml(title)}</h3>
+        ${subtitle ? `<p style="color: var(--text-mid); margin: 0 0 14px;">${util.escapeHtml(subtitle)}</p>` : ''}
+        ${fieldsHtml}
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px;">
+          <button type="button" class="btn btn--ghost" data-cancel>ביטול</button>
+          <button type="submit" class="btn btn--primary">${util.escapeHtml(submitLabel || 'אשר')}</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(host);
+    const form = host.querySelector('form');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const data = {};
+      fields.forEach(f => { data[f.name] = (form.elements[f.name].value || '').trim(); });
+      try { onSubmit(data); } catch (err) { console.error(err); }
+      host.remove();
+    });
+    host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+    // Auto-focus first field
+    const first = form.querySelector('input, select');
+    if (first) first.focus();
+  }
+
+  // ===== Manual gate population — modals =====
+  const DEPT_LABELS = { economy: 'אקונומיה', sanitation: 'תברואה', logistics: 'לוגיסטיקה' };
+
+  function openAddSupplierModal() {
+    openFormModal({
+      title: '+ הוסף ספק מאושר',
+      subtitle: 'הספק יתווסף לרשימה הירוקה של הש"ג ויאושר מראש לכניסה.',
+      fields: [
+        { name: 'vendor',  label: 'שם החברה / ספק', required: true, placeholder: 'אקונומיה אלפא בע"מ' },
+        { name: 'plate',   label: 'מספר רישוי',     required: true, placeholder: '12-345-67' },
+        { name: 'driver',  label: 'שם הנהג',        required: true },
+        { name: 'phone',   label: 'טלפון',          placeholder: '050-1234567' },
+        { name: 'department', label: 'מחלקה', type: 'select', required: true, options: [
+          { value: 'economy',    label: 'אקונומיה' },
+          { value: 'sanitation', label: 'תברואה' },
+          { value: 'logistics',  label: 'לוגיסטיקה' },
+        ]},
+      ],
+      submitLabel: 'אשר ספק',
+      onSubmit: (data) => {
+        const dept = DEPT_LABELS[data.department] || data.department;
+        const v = {
+          id: 'v-' + util.uuid().slice(0, 6),
+          plate: data.plate,
+          driver: data.driver,
+          vendor: data.vendor + ' · ' + dept,
+          phone: data.phone || null,
+          department: data.department,
+          cleared: true,
+          arrived: false,
+          addedByKabat: true,
+          addedAt: util.nowMs(),
+        };
+        ScoutDB.patch('vehicles', l => (l || []).concat([v]));
+        ScoutDB.appendAudit({ action: 'VEH-ADD-KABAT', channel: 'gate', details: `${data.vendor} (${dept}) — ${data.plate}` });
+        Bus.emit('bus:vehicle-added', v);
+        Toast.show('הספק נוסף לרשימה הירוקה. הש"ג יראה אותו כמאושר מראש.', { kind: 'ok' });
+        renderGates(); renderKpis();
+      },
+    });
+  }
+
+  function openAddBusModal() {
+    openFormModal({
+      title: '+ הקם אוטובוס מאושר',
+      subtitle: 'האוטובוס ייכנס ללוח ההיסעים בסטטוס "מתוכנן" וייראה לחמ"ל וסדרני השטח.',
+      fields: [
+        { name: 'tribeName',   label: 'שם השבט',         required: true, placeholder: 'נחל' },
+        { name: 'battalion',   label: 'גדוד',            required: true, placeholder: 'גדוד ב' },
+        { name: 'plate',       label: 'מספר רישוי',      required: true, placeholder: '70-555-44' },
+        { name: 'escort',      label: 'שם המלווה',       required: true },
+        { name: 'escortPhone', label: 'טלפון המלווה',    placeholder: '052-1234567' },
+        { name: 'hanichim',    label: 'כמות חניכים צפויה', type: 'number', required: true, placeholder: '38' },
+      ],
+      submitLabel: 'הקם אוטובוס',
+      onSubmit: (data) => {
+        const b = {
+          id: 'b-' + util.uuid().slice(0, 6),
+          plate: data.plate,
+          tribeId: null,
+          tribeName: data.tribeName,
+          battalion: data.battalion,
+          driver: null,
+          escort: data.escort,
+          escortPhone: data.escortPhone || null,
+          hanichim: parseInt(data.hanichim, 10) || 0,
+          status: 'planned',
+          addedByKabat: true,
+          addedAt: util.nowMs(),
+        };
+        ScoutDB.patch('buses', l => (l || []).concat([b]));
+        ScoutDB.appendAudit({ action: 'BUS-ADD-KABAT', channel: 'gate', details: `שבט ${data.tribeName} (${data.battalion}) — ${data.plate}` });
+        Bus.emit('bus:bus-added', b);
+        Toast.show('האוטובוס הוקם. סטטוס: מתוכנן (אפור) בלוח ההיסעים.', { kind: 'ok' });
+        renderGates(); renderKpis();
+      },
+    });
+  }
+
+  function openAddGuestModal() {
+    openFormModal({
+      title: '+ הנפק היתר כניסה לאורח',
+      subtitle: 'יונפק כרטיס אורח דיגיטלי. הש"ג יראה חיווי כחול: "אורח בתיאום קב"ט".',
+      fields: [
+        { name: 'name',        label: 'שם מלא',            required: true, placeholder: 'מאיר כהן' },
+        { name: 'affiliation', label: 'תפקיד / שיוך',      required: true, placeholder: 'הורה של חניך בתיאום' },
+        { name: 'plate',       label: 'מספר רכב',          required: true, placeholder: '99-887-66' },
+        { name: 'phone',       label: 'טלפון',             placeholder: '050-7654321' },
+      ],
+      submitLabel: 'הנפק היתר',
+      onSubmit: (data) => {
+        const guest = {
+          id: 'st-' + util.uuid().slice(0, 6),
+          name: data.name,
+          role: 'guest',
+          active: true,
+          guestPass: true,
+          kabatCoordinated: true,
+          affiliation: data.affiliation,
+          plate: data.plate,
+          phone: data.phone || null,
+          issuedAt: util.nowMs(),
+          issuedByKabat: true,
+        };
+        ScoutDB.patch('staff', l => (l || []).concat([guest]));
+        ScoutDB.set('personnelTelemetry', null);
+        ScoutDB.appendAudit({ action: 'GUEST-PASS-ISSUE', channel: 'gate', details: `${data.name} (${data.affiliation}) — רכב ${data.plate}` });
+        Bus.emit('bus:guest-issued', guest);
+        Toast.show('כרטיס אורח הונפק. הש"ג יראה אותו כ"אורח בתיאום קב"ט".', { kind: 'ok' });
+        renderGates(); renderKpis();
+      },
+    });
+  }
 
   document.getElementById('btn-bl-add').addEventListener('click', () => {
     const v = prompt('הוסף ת.ז. או מספר רכב לרשימה שחורה:');
@@ -1571,25 +1919,119 @@
   // ===== CHAT TAB =====
   // ============================================================
   let activeChannel = 'security';
+  let activeSideTab = 'channels';
+
+  function myStaffId() {
+    return UI.currentPersona().staffId || null;
+  }
+  function allVisibleChannels() {
+    return Chat.visibleChannels(UI.currentPersona().role, myStaffId());
+  }
+  function channelById(id) {
+    return allVisibleChannels().find(c => c.id === id) || Chat.channels().find(c => c.id === id);
+  }
+
+  // Sidebar tab switching
+  document.querySelectorAll('.chat-side-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.chat-side-tab').forEach(x => x.classList.remove('is-active'));
+      t.classList.add('is-active');
+      activeSideTab = t.dataset.sideTab;
+      document.querySelectorAll('[data-side-pane]').forEach(p => p.hidden = p.dataset.sidePane !== activeSideTab);
+      if (activeSideTab === 'contacts') renderContacts();
+      if (activeSideTab === 'channels') renderChannels();
+    });
+  });
+
   function renderChannels() {
-    const role = UI.currentPersona().role;
-    const chans = Chat.visibleChannels(role);
-    document.getElementById('chat-channels').innerHTML = chans.map(c => {
+    const chans = allVisibleChannels();
+    document.getElementById('chat-channels-list').innerHTML = chans.map(c => {
       const msgs = Chat.messages(c.id);
       const last = msgs[msgs.length - 1];
+      const classes = ['channel'];
+      if (c.locked) classes.push('locked');
+      if (c.custom) classes.push('is-custom');
+      if (c.isDM) classes.push('is-dm');
+      if (c.id === activeChannel) classes.push('is-active');
+      const isCustom = c.custom || c.isDM;
       return `
-        <div class="channel ${c.locked ? 'locked' : ''} ${c.id === activeChannel ? 'is-active' : ''}" data-channel="${c.id}">
+        <div class="${classes.join(' ')}" data-channel="${c.id}">
           <div class="ch-name">${util.escapeHtml(c.name)}</div>
-          <div class="ch-meta">${last ? util.escapeHtml(last.text.slice(0, 36)) + (last.text.length > 36 ? '...' : '') : 'אין הודעות'}</div>
+          <div class="ch-meta">${last ? util.escapeHtml(last.text.slice(0, 40)) + (last.text.length > 40 ? '...' : '') : 'אין הודעות'}</div>
+          ${isCustom ? `<div class="ch-actions"><button class="ch-del" data-delete-channel="${c.id}" title="מחק קבוצה">🗑 מחק</button></div>` : ''}
         </div>
       `;
     }).join('');
   }
+
+  function renderContacts() {
+    const staff = ScoutDB.get('staff', []) || [];
+    const devices = Personnel.devices();
+    const me = myStaffId();
+    // Group hierarchy
+    const groups = [
+      { label: 'אבטחה', roles: ['kabat','achmash','guard','patrol'] },
+      { label: 'רפואה', roles: ['doctor','medic','first-aid','clinic-chief'] },
+      { label: 'חמ"ל ולוגיסטיקה', roles: ['hq-op','hq-shift','sanitation','camp-director'] },
+      { label: 'מרכזי שבטים ואחר', roles: ['tribe','national','staff','guest'] },
+    ];
+    let html = '';
+    groups.forEach(g => {
+      const members = staff.filter(s => g.roles.includes(s.role) && s.id !== me);
+      if (members.length === 0) return;
+      html += `<div class="contact-group-head">${util.escapeHtml(g.label)} · ${members.length}</div>`;
+      html += members.map(s => {
+        const dev = devices.find(d => d.id === s.id);
+        const lastSeenSec = dev ? Math.round((util.nowMs() - dev.lastSeenTs) / 1000) : 9999;
+        const isOnline = dev && s.active && lastSeenSec < 120;
+        const initial = (s.name.split(' ').slice(-1)[0] || s.name)[0] || '?';
+        return `
+          <div class="contact-row ${isOnline ? '' : 'is-offline'}">
+            <div class="avatar">${util.escapeHtml(initial)}</div>
+            <div>
+              <div style="font-weight: 600;">${util.escapeHtml(s.name)}</div>
+              <div class="meta">
+                <span class="dot dot--${isOnline ? 'ok' : 'danger'}"></span>
+                ${isOnline ? 'מחובר' : 'מנותק'} · ${util.escapeHtml(UI.ROLE_LABELS[s.role] || s.role)}
+              </div>
+            </div>
+            <button class="dm-btn" data-dm-staff="${s.id}" ${me ? '' : 'disabled'} title="${me ? 'פתח שיחה פרטית' : 'התחבר כדי לפתוח DM'}">💬 שיחה</button>
+          </div>
+        `;
+      }).join('');
+    });
+    if (!html) html = '<div style="color: var(--text-low); padding: 18px; text-align:center;">אין אנשי קשר מחוברים.</div>';
+    document.getElementById('chat-contacts-list').innerHTML = html;
+  }
+
+  function renderChatHeader() {
+    const chan = channelById(activeChannel);
+    const el = document.getElementById('chat-header');
+    if (!chan) { el.innerHTML = ''; return; }
+    let icon = '#';
+    let title = chan.name;
+    let meta = '';
+    if (chan.locked) icon = '🔒';
+    else if (chan.isDM) { icon = '🗨'; meta = '· שיחה פרטית'; }
+    else if (chan.custom) {
+      icon = '👥';
+      meta = `· ${(chan.members || []).length} חברים`;
+    } else {
+      icon = '💬';
+      meta = '· ערוץ קבוצתי';
+    }
+    el.innerHTML = `
+      <span style="font-size: 16px;">${icon}</span>
+      <span style="flex:1;">${util.escapeHtml(title)}</span>
+      <span style="color: var(--text-mid); font-size: 12px; font-weight: 400;">${util.escapeHtml(meta)}</span>
+    `;
+  }
+
   function renderMessages() {
-    const role = UI.currentPersona().role;
-    const chan = Chat.channels().find(c => c.id === activeChannel);
+    const chan = channelById(activeChannel);
     if (!chan) return;
     const me = UI.currentPersona().name;
+    const myRole = UI.currentPersona().role;
     const msgs = Chat.messages(activeChannel);
     document.getElementById('chat-messages').innerHTML = msgs.map(m => {
       const cls = m.role === 'system' ? 'bubble--system' : (m.from === me ? 'bubble--me' : 'bubble--other');
@@ -1600,28 +2042,57 @@
           ${m.role !== 'system' ? `<span class="ts">${util.fmtTime(m.ts)}<span class="check">✓✓</span></span>` : ''}
         </div>
       `;
-    }).join('');
-    // Scroll to bottom
+    }).join('') || '<div style="color: var(--text-low); text-align:center; padding: 30px; font-family: var(--font-ui);">אין הודעות עדיין. שלח את הראשונה ↓</div>';
     const c = document.getElementById('chat-messages'); c.scrollTop = c.scrollHeight;
 
-    // Compose state — locked channels disable input for non-authorized
+    // Compose state — locked channels block non-authorized
     const form = document.getElementById('chat-compose');
-    const isAllowed = !chan.locked || ['kabat','hq-shift','hq-op','national'].includes(role);
+    const isAllowed = !chan.locked || ['kabat','hq-shift','hq-op','national'].includes(myRole);
     form.querySelector('[name="msg"]').disabled = !isAllowed;
     form.querySelector('button[type="submit"]').disabled = !isAllowed;
-    if (!isAllowed) {
-      form.querySelector('[name="msg"]').placeholder = '🔒 ערוץ נעול לכתיבה — רק חמ"ל/קב"ט';
-    } else {
-      form.querySelector('[name="msg"]').placeholder = 'הקלד הודעה...';
-    }
+    form.querySelector('[name="msg"]').placeholder = isAllowed ? 'הקלד הודעה...' : '🔒 ערוץ נעול לכתיבה — רק חמ"ל/קב"ט';
+
+    renderChatHeader();
   }
-  document.getElementById('chat-channels').addEventListener('click', e => {
+
+  // Channel + delete click
+  document.getElementById('chat-channels-list').addEventListener('click', e => {
+    const del = e.target.closest('[data-delete-channel]');
+    if (del) {
+      e.stopPropagation();
+      if (!confirm('למחוק את הקבוצה/השיחה? פעולה זו תסיר את ההיסטוריה.')) return;
+      const id = del.dataset.deleteChannel;
+      Chat.deleteChannel(id);
+      if (activeChannel === id) activeChannel = 'security';
+      Toast.show('הקבוצה נמחקה.', { kind: 'warn' });
+      renderChannels(); renderMessages(); updateChatBadge();
+      return;
+    }
     const c = e.target.closest('[data-channel]');
     if (!c) return;
     activeChannel = c.dataset.channel;
     renderChannels();
     renderMessages();
   });
+
+  // DM click in contacts
+  document.getElementById('chat-contacts-list').addEventListener('click', e => {
+    const dm = e.target.closest('[data-dm-staff]');
+    if (!dm) return;
+    const me = myStaffId();
+    if (!me) { Toast.show('הזדהות כמשתמש לא קיימת. התחבר עם משתמש שהוא חלק מהצוות.', { kind: 'warn' }); return; }
+    const other = dm.dataset.dmStaff;
+    const channel = Chat.openDM(me, other);
+    activeChannel = channel.id;
+    // Switch back to channels view
+    document.querySelector('.chat-side-tab[data-side-tab="channels"]').click();
+    Scout.Audio.play('blip');
+    Toast.show('שיחה פרטית נפתחה.', { kind: 'ok' });
+    renderChannels();
+    renderMessages();
+    updateChatBadge();
+  });
+
   document.getElementById('chat-compose').addEventListener('submit', e => {
     e.preventDefault();
     const input = e.target.msg;
@@ -1641,9 +2112,95 @@
     Toast.show('הכריזה נשלחה לכל הצוותים.', { kind: 'warn' });
   });
 
+  // Group creator
+  document.getElementById('btn-create-group').addEventListener('click', openGroupCreator);
+
+  function openGroupCreator() {
+    const staff = (ScoutDB.get('staff', []) || []).filter(s => s.active && !s.guestPass);
+    const me = myStaffId();
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    host.innerHTML = `
+      <form class="modal" style="width: min(580px, 92vw);">
+        <h3>👥 צור קבוצת קשר חדשה</h3>
+        <p style="color: var(--text-mid); margin: 0 0 14px;">בחר חברי צוות לצירוף. הקבוצה תוקפץ אצלם מיידית ותופיע בסרגל הצ'אט.</p>
+
+        <div class="form-field">
+          <label>שם הקבוצה *</label>
+          <input class="input" type="text" name="group-name" required
+                 placeholder='לדוגמה: "צוות חיפוש גזרה מערבית"' autocomplete="off">
+        </div>
+
+        <div class="form-field">
+          <label>חברים — בחר V לצירוף *</label>
+          <div class="checkbox-list" id="grp-checks">
+            ${staff.map(s => `
+              <label class="checkbox-row">
+                <input type="checkbox" name="member" value="${s.id}">
+                <div>
+                  <div style="font-weight: 600;">${util.escapeHtml(s.name)}</div>
+                  <div style="font-size: 11px; color: var(--text-mid);">${util.escapeHtml(UI.ROLE_LABELS[s.role] || s.role)}</div>
+                </div>
+                <span class="chip ${s.active ? 'chip--ok' : ''}">${s.active ? 'מחובר' : 'מנותק'}</span>
+              </label>
+            `).join('')}
+          </div>
+          <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn btn--sm btn--ghost" id="select-all">בחר הכל</button>
+            <button type="button" class="btn btn--sm btn--ghost" id="select-none">נקה</button>
+            <span style="flex:1"></span>
+            <span class="chip" id="grp-counter">0 נבחרו</span>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 18px;">
+          <button type="button" class="btn btn--ghost" data-cancel>ביטול</button>
+          <button type="submit" class="btn btn--primary">צור קבוצה</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(host);
+    const form = host.querySelector('form');
+    const counter = host.querySelector('#grp-counter');
+    const updateCounter = () => {
+      const n = host.querySelectorAll('input[name="member"]:checked').length;
+      counter.textContent = n + ' נבחרו';
+    };
+    host.querySelector('#grp-checks').addEventListener('change', updateCounter);
+    host.querySelector('#select-all').addEventListener('click', () => {
+      host.querySelectorAll('input[name="member"]').forEach(c => c.checked = true);
+      updateCounter();
+    });
+    host.querySelector('#select-none').addEventListener('click', () => {
+      host.querySelectorAll('input[name="member"]').forEach(c => c.checked = false);
+      updateCounter();
+    });
+    host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = form['group-name'].value.trim();
+      const members = Array.from(host.querySelectorAll('input[name="member"]:checked')).map(c => c.value);
+      if (!name) { Toast.show('יש להזין שם לקבוצה.', { kind: 'warn' }); return; }
+      if (members.length === 0) { Toast.show('יש לבחור לפחות חבר אחד.', { kind: 'warn' }); return; }
+      // Include creator if they have a staffId
+      if (me && !members.includes(me)) members.push(me);
+      const grp = Chat.createGroup(name, members, me);
+      activeChannel = grp.id;
+      // Push a kabat welcome message
+      Chat.send(grp.id, `הקבוצה הוקמה בידי הקב״ט. ${members.length} חברים. תקשרו כאן.`);
+      Scout.Audio.play('echo-bell');
+      Toast.show(`הקבוצה "${name}" נוצרה ונכפתה אצל ${members.length} חברים.`, { kind: 'ok' });
+      host.remove();
+      // Switch to channels tab + render
+      document.querySelector('.chat-side-tab[data-side-tab="channels"]').click();
+      renderChannels(); renderMessages(); updateChatBadge();
+    });
+    form.querySelector('[name="group-name"]').focus();
+  }
+
   function updateChatBadge() {
-    const role = UI.currentPersona().role;
-    const total = Chat.visibleChannels(role).reduce((s, c) => s + Chat.messages(c.id).length, 0);
+    const total = allVisibleChannels().reduce((s, c) => s + Chat.messages(c.id).length, 0);
     document.getElementById('b-chat').textContent = total;
   }
 
@@ -1662,7 +2219,9 @@
   });
   Bus.on('drone:update', renderDrone);
   Bus.on('chat:new', () => { renderChannels(); renderMessages(); updateChatBadge(); });
-  Bus.on('personnel:update', renderDevices);
+  Bus.on('chat:groups-updated', () => { renderChannels(); updateChatBadge(); });
+  Bus.on('personnel:update', () => { renderDevices(); renderContacts(); });
+  Bus.on('bus:guest-issued', () => { renderGates(); renderKpis(); renderContacts(); });
 
   UI.bindGlobalSOS({ lock: false });
 

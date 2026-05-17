@@ -229,7 +229,7 @@
           <div class="vehicle-plate">${util.escapeHtml(v.plate)}</div>
           <div class="info">
             <div class="driver">${util.escapeHtml(v.driver)}</div>
-            <div class="vendor">${util.escapeHtml(v.vendor)}</div>
+            <div class="vendor">${util.escapeHtml(v.vendor)}${v.addedByKabat ? ' <span class="chip" style="background: rgba(91,141,239,0.18); color: var(--info); border-color: transparent;">הוסף ע״י קב״ט</span>' : ''}</div>
           </div>
           ${v.arrived
             ? '<span class="chip chip--info">בתוך המחנה</span>'
@@ -263,13 +263,14 @@
       </div>
       ${buses.map(b => {
         const t = tribes.find(tr => tr.id === b.tribeId);
+        const tName = t ? t.name : (b.tribeName || '—');
         const canEnter = b.status === 'cleared';
         return `
           <div class="bus-row">
             <span class="vehicle-plate" style="font-size: 13px; min-width: auto;">${util.escapeHtml(b.plate)}</span>
             <div>
-              <div style="font-weight: 700;">שבט ${util.escapeHtml(t ? t.name : '—')} · ${util.escapeHtml(b.battalion)}</div>
-              <div style="color: var(--text-mid); font-size: 11px;">נהג: ${util.escapeHtml(b.driver)} · מלווה: ${util.escapeHtml(b.escort)} · ${b.hanichim} חניכים</div>
+              <div style="font-weight: 700;">שבט ${util.escapeHtml(tName)} · ${util.escapeHtml(b.battalion || '')}${b.addedByKabat ? ' <span class="chip" style="background: rgba(91,141,239,0.18); color: var(--info); border-color: transparent;">קב״ט</span>' : ''}</div>
+              <div style="color: var(--text-mid); font-size: 11px;">${b.driver ? 'נהג: ' + util.escapeHtml(b.driver) + ' · ' : ''}${b.escort ? 'מלווה: ' + util.escapeHtml(b.escort) + ' · ' : ''}${b.hanichim || 0} חניכים</div>
             </div>
             <span class="bus-status ${b.status}">${BUS_STATUS_LABEL[b.status]}</span>
             ${canEnter ? `<button class="btn btn--ok btn--sm" data-bus-in="${b.id}">הכנס למחנה</button>` :
@@ -307,13 +308,15 @@
         <button class="btn btn--sm" id="btn-add-staff">+ הוסף אורח</button>
       </div>
       ${staff.map(s => `
-        <div class="vehicle-card">
-          <div style="width: 40px; height: 40px; background: var(--bg-deep); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; border: 1px solid var(--border);">${util.escapeHtml(s.name.split(' ').slice(-1)[0][0] || '?')}</div>
+        <div class="vehicle-card" ${s.kabatCoordinated ? 'style="border-color: var(--info); box-shadow: inset 4px 0 0 var(--info);"' : ''}>
+          <div style="width: 40px; height: 40px; background: ${s.kabatCoordinated ? 'var(--info)' : 'var(--bg-deep)'}; color: ${s.kabatCoordinated ? '#fff' : 'inherit'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; border: 1px solid var(--border);">${util.escapeHtml((s.name.split(' ').slice(-1)[0] || s.name)[0] || '?')}</div>
           <div class="info">
-            <div class="driver">${util.escapeHtml(s.name)}</div>
-            <div class="vendor">${UI.ROLE_LABELS[s.role] || s.role}</div>
+            <div class="driver">${util.escapeHtml(s.name)}${s.plate ? ' · <span style="font-family: var(--font-mono); color: var(--text-mid);">' + util.escapeHtml(s.plate) + '</span>' : ''}</div>
+            <div class="vendor">${util.escapeHtml(s.affiliation || UI.ROLE_LABELS[s.role] || s.role)}</div>
           </div>
-          <span class="chip ${s.active ? 'chip--ok' : ''}">${s.active ? 'פעיל' : 'לא פעיל'}</span>
+          ${s.kabatCoordinated
+            ? '<span class="chip" style="background: rgba(91,141,239,0.22); color: var(--info); border-color: transparent; font-weight: 700; font-size: 12px;">🔷 אורח בתיאום קב״ט</span>'
+            : `<span class="chip ${s.active ? 'chip--ok' : ''}">${s.active ? 'פעיל' : 'לא פעיל'}</span>`}
         </div>
       `).join('')}
     `;
@@ -407,6 +410,10 @@
 
   // Sync new items added by ourselves
   Bus.on('bus:gate-exception', () => renderExceptions());
+  // Items added by Kabat in real-time
+  Bus.on('bus:vehicle-added', () => { renderSuppliers(); Scout.Audio.play('blip'); Toast.show('ספק חדש התווסף ע"י הקב"ט.', { kind: 'ok' }); });
+  Bus.on('bus:bus-added',     () => { renderBuses();     Scout.Audio.play('blip'); Toast.show('אוטובוס חדש בלוח ההיסעים.', { kind: 'ok' }); });
+  Bus.on('bus:guest-issued',  () => { renderStaff();     Scout.Audio.play('blip'); Toast.show('כרטיס אורח הונפק ע"י הקב"ט.', { kind: 'ok' }); });
 
   UI.bindGlobalSOS({ lock: false });
 
