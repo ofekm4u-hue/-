@@ -353,8 +353,9 @@
   'use strict';
   const { ScoutDB, UI, Toast, util, Auth } = Scout;
 
-  // If already logged in, route to the user's home page
+  // If already logged in: pending → onboarding, else → role's home
   if (Auth.isLoggedIn()) {
+    if (Auth.isPending()) { location.replace('onboarding.html'); return; }
     const p = UI.currentPersona();
     location.replace(Auth.routeForRole(p.role));
     return;
@@ -434,8 +435,12 @@
       }
 
       if (remember) ScoutDB.set('rememberMe', true);
-      // Route to role's home
-      location.replace(Auth.routeForRole(result.persona.role));
+      // Pending users → onboarding flow; everyone else → role's home
+      if (result.pending) {
+        location.replace('onboarding.html');
+      } else {
+        location.replace(Auth.routeForRole(result.persona.role));
+      }
     }, 350);
   });
 

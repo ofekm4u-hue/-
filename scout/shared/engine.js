@@ -843,14 +843,14 @@
   // ---------- Auth ----------
 
   const Auth = (function () {
-    // Demo credentials: username → { role, name, password, staffId }
-    const CREDENTIALS = {
-      'national': { role: 'national',     name: 'אורי שדה — מנהל ארצי', password: '1234' },
-      'kabat':    { role: 'kabat',        name: 'קב״ט ניר אלון',         password: '1234', staffId: 's1' },
-      'operator': { role: 'hq-op',        name: 'תורן עידו',              password: '1234', staffId: 's4' },
-      'guard':    { role: 'guard',        name: 'מאבטח אופיר',           password: '1234', staffId: 's8' },
-      'tribe':    { role: 'tribe',        name: 'מרכז שבט נחל',           password: '1234' },
-      'clinic':   { role: 'clinic-chief', name: 'ד״ר נועה לוי',           password: '1234', staffId: 's5' },
+    // Default seed credentials — copied to DB on first run so they can be edited live
+    const DEFAULT_CREDENTIALS = {
+      'national': { role: 'national',     name: 'אורי שדה — מנהל ארצי', password: '1234', isDemo: true, status: 'active' },
+      'kabat':    { role: 'kabat',        name: 'קב״ט ניר אלון',         password: '1234', isDemo: true, status: 'active', staffId: 's1' },
+      'operator': { role: 'hq-op',        name: 'תורן עידו',              password: '1234', isDemo: true, status: 'active', staffId: 's4' },
+      'guard':    { role: 'guard',        name: 'מאבטח אופיר',           password: '1234', isDemo: true, status: 'active', staffId: 's8' },
+      'tribe':    { role: 'tribe',        name: 'מרכז שבט נחל',           password: '1234', isDemo: true, status: 'active' },
+      'clinic':   { role: 'clinic-chief', name: 'ד״ר נועה לוי',           password: '1234', isDemo: true, status: 'active', staffId: 's5' },
     };
 
     const ROUTES = {
@@ -860,23 +860,66 @@
       'guard':        'gate-guard.html',
       'tribe':        'tribe.html',
       'clinic-chief': 'clinic.html',
+      'achmash':      'gate-guard.html',
+      'patrol':       'gate-guard.html',
+      'medic':        'clinic.html',
+      'first-aid':    'clinic.html',
+      'doctor':       'clinic.html',
+      'hq-shift':     'hq-operator.html',
+      'sanitation':   'home.html',
+      'safety':       'home.html',
+      'camp-director':'home.html',
     };
 
+    function ensureCredsSeed() {
+      if (ScoutDB.get('credentials', null)) return;
+      ScoutDB.set('credentials', DEFAULT_CREDENTIALS);
+    }
+    ensureCredsSeed();
+
+    function getCreds() { return ScoutDB.get('credentials', {}) || {}; }
+    function setCreds(c) { ScoutDB.set('credentials', c); }
+
+    function generateTempPassword() {
+      const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+      let s = '';
+      for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+      return s;
+    }
+
+    function findCred(username) {
+      const creds = getCreds();
+      const trimmed = String(username || '').trim();
+      if (creds[trimmed]) return { user: trimmed, cred: creds[trimmed] };
+      const lower = trimmed.toLowerCase();
+      if (creds[lower]) return { user: lower, cred: creds[lower] };
+      return null;
+    }
+
     function login(username, password) {
-      const u = String(username || '').trim().toLowerCase();
-      const cred = CREDENTIALS[u];
-      if (!cred) return { ok: false, error: 'שם משתמש לא קיים במערכת' };
+      const found = findCred(username);
+      if (!found) return { ok: false, error: 'שם משתמש לא קיים במערכת' };
+      const { user, cred } = found;
       if (cred.password !== password) return { ok: false, error: 'סיסמה שגויה' };
-      UI.setPersona({ name: cred.name, role: cred.role, staffId: cred.staffId });
+      UI.setPersona({ name: cred.name, role: cred.role, staffId: cred.staffId, username: user });
       ScoutDB.set('loggedIn', true);
       ScoutDB.set('loginTs', nowMs());
-      ScoutDB.set('loginUser', u);
-      ScoutDB.appendAudit({
-        action: 'LOGIN', channel: 'auth',
-        details: 'התחבר בתור ' + u,
-        actor: cred.name + ' / ' + (UI.ROLE_LABELS[cred.role] || cred.role),
-      });
-      return { ok: true, persona: { name: cred.name, role: cred.role } };
+      ScoutDB.set('loginUser', user);
+      const isPendingNow = cred.status === 'pending';
+      if (isPendingNow) {
+        ScoutDB.appendAudit({
+          action: 'LOGIN-PENDING', channel: 'auth',
+          details: 'משתמש זמני התחבר לראשונה: ' + user,
+          actor: user + ' / ' + (UI.ROLE_LABELS[cred.role] || cred.role),
+        });
+      } else {
+        ScoutDB.appendAudit({
+          action: 'LOGIN', channel: 'auth',
+          details: 'התחבר בתור ' + user,
+          actor: cred.name + ' / ' + (UI.ROLE_LABELS[cred.role] || cred.role),
+        });
+      }
+      return { ok: true, persona: { name: cred.name, role: cred.role, staffId: cred.staffId }, pending: isPendingNow };
     }
 
     function logout() {
@@ -896,11 +939,17 @@
       return !!ScoutDB.get('loggedIn', false);
     }
 
+    function isPending() {
+      if (!isLoggedIn()) return false;
+      const u = ScoutDB.get('loginUser', null);
+      if (!u) return false;
+      const cred = getCreds()[u];
+      return !!(cred && cred.status === 'pending');
+    }
+
     function requireLogin() {
-      if (!isLoggedIn()) {
-        location.replace('index.html');
-        return false;
-      }
+      if (!isLoggedIn()) { location.replace('index.html'); return false; }
+      if (isPending()) { location.replace('onboarding.html'); return false; }
       return true;
     }
 
@@ -909,13 +958,135 @@
     }
 
     function listDemoUsers() {
-      return Object.entries(CREDENTIALS).map(([user, c]) => ({
-        user, role: c.role, name: c.name,
-        roleLabel: UI.ROLE_LABELS[c.role] || c.role,
-      }));
+      return Object.entries(getCreds())
+        .filter(([_, c]) => c.isDemo)
+        .map(([user, c]) => ({
+          user, role: c.role, name: c.name,
+          roleLabel: UI.ROLE_LABELS[c.role] || c.role,
+        }));
     }
 
-    return { login, logout, isLoggedIn, requireLogin, routeForRole, listDemoUsers };
+    function issueTempUser(role) {
+      if (!role) throw new Error('role required');
+      const creds = getCreds();
+      let tempUsername = 'temp_user_' + (100 + Math.floor(Math.random() * 900));
+      while (creds[tempUsername]) tempUsername = 'temp_user_' + (100 + Math.floor(Math.random() * 900));
+      const tempPassword = generateTempPassword();
+      const staffId = 'st-' + uuid().slice(0, 6);
+
+      ScoutDB.patch('staff', l => (l || []).concat([{
+        id: staffId,
+        name: tempUsername,
+        role,
+        active: true,
+        pendingOnboarding: true,
+        tempUsername,
+        createdByKabat: true,
+        createdAt: nowMs(),
+      }]));
+      ScoutDB.set('personnelTelemetry', null);
+
+      creds[tempUsername] = {
+        role, name: tempUsername, password: tempPassword,
+        staffId, status: 'pending', createdAt: nowMs(),
+      };
+      setCreds(creds);
+
+      const roleLabel = UI.ROLE_LABELS[role] || role;
+      ScoutDB.appendAudit({
+        action: 'USER-INVITE', channel: 'auth',
+        details: `הונפק משתמש זמני "${tempUsername}" בתפקיד ${roleLabel} — ממתין להפעלה`,
+      });
+      Bus.emit('auth:user-invited', { tempUsername, role, staffId });
+      Bus.emit('personnel:update', { staffId, invited: true });
+      return { tempUsername, tempPassword, role, staffId };
+    }
+
+    function completeOnboarding(profile) {
+      profile = profile || {};
+      const fullName = String(profile.fullName || '').trim();
+      const phone = String(profile.phone || '').trim();
+      const newPassword = String(profile.password || '');
+      if (!fullName) return { ok: false, error: 'שם מלא נדרש' };
+      if (!phone)    return { ok: false, error: 'טלפון נדרש' };
+      if (newPassword.length < 6) return { ok: false, error: 'הסיסמה חייבת להיות לפחות 6 תווים' };
+
+      const u = ScoutDB.get('loginUser', null);
+      const creds = getCreds();
+      const cred = u && creds[u];
+      if (!cred || cred.status !== 'pending') return { ok: false, error: 'אין onboarding ממתין' };
+
+      let credKey = fullName;
+      let suffix = 1;
+      while (creds[credKey] && credKey !== u) {
+        credKey = fullName + ' (' + (++suffix) + ')';
+      }
+
+      ScoutDB.patch('staff', l => l.map(s =>
+        s.id === cred.staffId ? Object.assign({}, s, {
+          name: credKey,
+          phone,
+          pendingOnboarding: false,
+          tempUsername: null,
+          onboardedAt: nowMs(),
+        }) : s
+      ));
+      ScoutDB.set('personnelTelemetry', null);
+
+      delete creds[u];
+      creds[credKey] = {
+        role: cred.role,
+        name: credKey,
+        password: newPassword,
+        staffId: cred.staffId,
+        status: 'active',
+        phone,
+        onboardedAt: nowMs(),
+      };
+      setCreds(creds);
+
+      UI.setPersona({ name: credKey, role: cred.role, staffId: cred.staffId, username: credKey });
+      ScoutDB.set('loginUser', credKey);
+
+      const roleLabel = UI.ROLE_LABELS[cred.role] || cred.role;
+      ScoutDB.appendAudit({
+        action: 'USER-ACTIVATED',
+        channel: 'auth',
+        details: `[SYSTEM]: המשתמש ${credKey} הפעיל את חשבונו בהצלחה ונכנס לרשת בתפקיד ${roleLabel}`,
+        actor: credKey + ' / ' + roleLabel,
+      });
+      Bus.emit('auth:onboarded', { username: credKey, role: cred.role, staffId: cred.staffId });
+      Bus.emit('personnel:update', { staffId: cred.staffId, onboarded: true });
+
+      return { ok: true, persona: { name: credKey, role: cred.role, staffId: cred.staffId } };
+    }
+
+    function getPendingUsers() {
+      return Object.entries(getCreds())
+        .filter(([_, c]) => c.status === 'pending')
+        .map(([user, c]) => ({ user, ...c }));
+    }
+
+    function revokePendingUser(username) {
+      const creds = getCreds();
+      const cred = creds[username];
+      if (!cred || cred.status !== 'pending') return false;
+      delete creds[username];
+      setCreds(creds);
+      if (cred.staffId) {
+        ScoutDB.patch('staff', l => (l || []).filter(s => s.id !== cred.staffId));
+        ScoutDB.set('personnelTelemetry', null);
+      }
+      ScoutDB.appendAudit({ action: 'USER-INVITE-REVOKE', channel: 'auth', details: username });
+      Bus.emit('personnel:update', { staffId: cred.staffId, revoked: true });
+      return true;
+    }
+
+    return {
+      login, logout, isLoggedIn, isPending, requireLogin, routeForRole,
+      listDemoUsers, issueTempUser, completeOnboarding,
+      getPendingUsers, revokePendingUser,
+    };
   })();
 
   // ---------- Drone (Module 18 — Restricted) ----------
