@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>שו"ב | הפעלת חשבון</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<style>
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(77,208,225,0.10), transparent 50%),
+      radial-gradient(ellipse 60% 50% at 100% 100%, rgba(45,216,129,0.10), transparent 55%);
+    z-index: -1;
+  }
+
+  .onboard-shell {
+    width: 100%;
+    max-width: 540px;
+    animation: fade-in 320ms var(--ease);
+  }
+
+  .welcome-hero {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .welcome-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--info));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    box-shadow: 0 12px 40px var(--accent-glow);
+  }
+  .welcome-line {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .welcome-title {
+    font-family: var(--font-ui);
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .welcome-text {
+    color: var(--text-mid);
+    line-height: 1.6;
+  }
+
+  .onboard-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 30px;
+    box-shadow: var(--shadow-hi);
+  }
+
+  .stage-info {
+    background: rgba(91,141,239,0.08);
+    border: 1px solid rgba(91,141,239,0.3);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .stage-info .ico { font-size: 18px; }
+  .stage-info .role-tag {
+    color: var(--info);
+    font-weight: 700;
+    font-family: var(--font-ui);
+  }
+
+  .form-field {
+    margin-bottom: 16px;
+  }
+  .form-field label {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+  .form-field label .required { color: var(--danger); }
+  .form-field .hint {
+    font-size: 11px;
+    color: var(--text-low);
+    margin-top: 4px;
+  }
+  .input-with-icon {
+    position: relative;
+  }
+  .input-with-icon .input {
+    padding-right: 42px;
+    height: 44px;
+    font-size: 15px;
+  }
+  .input-with-icon .icon {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+    color: var(--text-low);
+    font-size: 16px;
+    pointer-events: none;
+  }
+  .input.is-invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-soft);
+  }
+  .input.is-valid {
+    border-color: var(--ok);
+  }
+
+  .password-strength {
+    height: 4px;
+    background: var(--bg-deep);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 6px;
+    position: relative;
+  }
+  .password-strength::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: var(--w, 0%);
+    background: var(--clr, var(--danger));
+    transition: width var(--t-base), background var(--t-base);
+  }
+  .strength-text {
+    font-size: 11px;
+    color: var(--text-mid);
+    margin-top: 4px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+  }
+
+  .error-msg {
+    background: rgba(255,71,87,0.10);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 10px 14px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: fade-in 200ms var(--ease);
+  }
+  .error-msg.is-active { display: flex; }
+
+  .activate-btn {
+    width: 100%;
+    height: 50px;
+    font-size: 16px;
+    margin-top: 12px;
+    transition: all var(--t-base);
+  }
+  .activate-btn:disabled {
+    opacity: 0.4;
+  }
+
+  .system-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 18px;
+  }
+  .sys-tag {
+    padding: 3px 10px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    font-size: 10px;
+    color: var(--text-mid);
+    font-family: var(--font-ui);
+    font-weight: 600;
+  }
+
+  @media (max-width: 480px) {
+    .onboard-card { padding: 22px; }
+  }
+</style>
+</head>
+<body class="tactical-grid">
+  <div class="onboard-shell">
+    <div class="welcome-hero">
+      <div class="welcome-icon">🎯</div>
+      <div class="welcome-line">First-Time Activation</div>
+      <h1 class="welcome-title">ברוך הבא למערכת השו"ב!</h1>
+      <p class="welcome-text">מחנות הקיץ של תנועת הצופים<br>להשלמת הגדרת החשבון, אנא מלא את פרטיך.</p>
+    </div>
+
+    <form class="onboard-card" id="onboard-form" autocomplete="off" novalidate>
+      <div class="stage-info">
+        <span class="ico">🔑</span>
+        <div style="flex:1;">
+          <div>הקב"ט הנפיק עבורך חשבון בתפקיד:</div>
+          <div style="margin-top: 4px;">
+            <span class="role-tag" data-role-label>—</span>
+            <span style="color: var(--text-mid); font-size: 12px;">· <span data-temp-username>—</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-msg" id="error-msg" role="alert">
+        <span>⚠</span>
+        <span data-error-text></span>
+      </div>
+
+      <div class="form-field">
+        <label>שם מלא <span class="required">*</span></label>
+        <div class="input-with-icon">
+          <input class="input" type="text" name="fullName" required
+                 autocomplete="name" placeholder="לדוגמה: ישראל ישראלי">
+          <span class="icon">👤</span>
+        </div>
+        <div class="hint">שם זה יוצג על המפה, בצ'אטים המבצעיים ובלוג החמ"ל מעתה.</div>
+      </div>
+
+      <div class="form-field">
+        <label>מספר טלפון נייד <span class="required">*</span></label>
+        <div class="input-with-icon">
+          <input class="input" type="tel" name="phone" required
+                 autocomplete="tel" placeholder="050-1234567"
+                 inputmode="tel" pattern="[0-9\-\+\s]+">
+          <span class="icon">📱</span>
+        </div>
+        <div class="hint">משמש את החמ"ל ליצירת קשר מהיר בעת הצורך.</div>
+      </div>
+
+      <div class="form-field">
+        <label>סיסמה קבועה חדשה <span class="required">*</span></label>
+        <div class="input-with-icon">
+          <input class="input" type="password" name="password" required
+                 autocomplete="new-password" placeholder="לפחות 6 תווים" minlength="6">
+          <span class="icon">🔒</span>
+        </div>
+        <div class="password-strength" id="pwd-meter"></div>
+        <div class="strength-text" id="strength-text">בחר סיסמה</div>
+      </div>
+
+      <div class="form-field">
+        <label>אימות סיסמה <span class="required">*</span></label>
+        <div class="input-with-icon">
+          <input class="input" type="password" name="passwordConfirm" required
+                 autocomplete="new-password" placeholder="חזור על הסיסמה">
+          <span class="icon">✓</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--lg activate-btn" disabled>
+        הפעל חשבון וכנס למערכת ←
+      </button>
+
+      <div class="system-tags">
+        <span class="sys-tag">🔒 הסיסמה מוצפנת AES-256</span>
+        <span class="sys-tag">📌 חד-פעמי בלבד</span>
+        <span class="sys-tag">⚠ לא ניתן לדלג</span>
+      </div>
+    </form>
+  </div>
+
+<script src="shared/engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { ScoutDB, UI, Toast, util, Auth } = Scout;
+
+  // Guard: must be logged in AND pending
+  if (!Auth.isLoggedIn()) { location.replace('index.html'); return; }
+  if (!Auth.isPending()) { location.replace(Auth.routeForRole(UI.currentPersona().role)); return; }
+
+  // Display invitation context
+  const p = UI.currentPersona();
+  document.querySelector('[data-role-label]').textContent = UI.ROLE_LABELS[p.role] || p.role;
+  document.querySelector('[data-temp-username]').textContent = ScoutDB.get('loginUser', '');
+
+  // Form refs
+  const form = document.getElementById('onboard-form');
+  const fullNameInput = form.fullName;
+  const phoneInput = form.phone;
+  const pwdInput = form.password;
+  const confirmInput = form.passwordConfirm;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const errEl = document.getElementById('error-msg');
+
+  function showError(msg) {
+    errEl.querySelector('[data-error-text]').textContent = msg;
+    errEl.classList.add('is-active');
+  }
+  function hideError() {
+    errEl.classList.remove('is-active');
+  }
+
+  // Password strength
+  const pwdMeter = document.getElementById('pwd-meter');
+  const strengthText = document.getElementById('strength-text');
+  function pwdScore(p) {
+    let s = 0;
+    if (p.length >= 6) s++;
+    if (p.length >= 10) s++;
+    if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
+    if (/\d/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  }
+  function updateStrength() {
+    const pw = pwdInput.value;
+    const s = pwdScore(pw);
+    const map = [
+      { w: '0%',   c: 'var(--danger)', t: 'בחר סיסמה' },
+      { w: '20%',  c: 'var(--danger)', t: 'חלשה מדי' },
+      { w: '40%',  c: 'var(--danger)', t: 'חלשה' },
+      { w: '60%',  c: 'var(--warn)',   t: 'בינונית' },
+      { w: '80%',  c: 'var(--ok)',     t: 'חזקה' },
+      { w: '100%', c: 'var(--ok)',     t: 'חזקה מאוד' },
+    ];
+    const m = map[Math.min(s, 5)];
+    pwdMeter.style.setProperty('--w', m.w);
+    pwdMeter.style.setProperty('--clr', m.c);
+    strengthText.textContent = m.t;
+    strengthText.style.color = m.c;
+  }
+
+  function isFormValid() {
+    const name = fullNameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const pw = pwdInput.value;
+    const conf = confirmInput.value;
+    if (!name || name.length < 2) return false;
+    if (!phone || phone.replace(/[^\d]/g, '').length < 9) return false;
+    if (pw.length < 6) return false;
+    if (pw !== conf) return false;
+    return true;
+  }
+
+  function validate() {
+    [fullNameInput, phoneInput, pwdInput, confirmInput].forEach(i => i.classList.remove('is-invalid', 'is-valid'));
+    const name = fullNameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const pw = pwdInput.value;
+    const conf = confirmInput.value;
+    if (name.length >= 2) fullNameInput.classList.add('is-valid');
+    if (phone.replace(/[^\d]/g, '').length >= 9) phoneInput.classList.add('is-valid');
+    if (pw.length >= 6) pwdInput.classList.add('is-valid');
+    if (conf && pw === conf) confirmInput.classList.add('is-valid');
+    else if (conf && pw !== conf) confirmInput.classList.add('is-invalid');
+
+    submitBtn.disabled = !isFormValid();
+    hideError();
+  }
+
+  form.addEventListener('input', () => { updateStrength(); validate(); });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!isFormValid()) return;
+    const fullName = fullNameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const password = pwdInput.value;
+    const conf = confirmInput.value;
+
+    if (password !== conf) {
+      confirmInput.classList.add('is-invalid');
+      showError('הסיסמאות אינן תואמות.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'מפעיל חשבון...';
+
+    setTimeout(() => {
+      const result = Auth.completeOnboarding({ fullName, phone, password });
+      if (!result.ok) {
+        showError(result.error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'הפעל חשבון וכנס למערכת ←';
+        return;
+      }
+      // Audio: success "blip" if armed
+      try { Scout.Audio.play('echo-bell'); } catch (e) {}
+      // Route to role's home
+      location.replace(Auth.routeForRole(result.persona.role));
+    }, 400);
+  });
+
+  fullNameInput.focus();
+})();
+</script>
+</body>
+</html>

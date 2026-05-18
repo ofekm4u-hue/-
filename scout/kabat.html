@@ -824,7 +824,8 @@
         <button class="sub-tab is-active" data-sub="exceptions">⚠ ממתינים לאישור <span class="ct" id="ct-exc">0</span></button>
         <button class="sub-tab" data-sub="suppliers">🚚 ספקים <span class="ct" id="ct-sup">0</span></button>
         <button class="sub-tab" data-sub="buses">🚌 אוטובוסים <span class="ct" id="ct-bus">0</span></button>
-        <button class="sub-tab" data-sub="staff">👤 סגל ואורחים <span class="ct" id="ct-staff">0</span></button>
+        <button class="sub-tab" data-sub="staff">👥 צוות מחנה והנהגה <span class="ct" id="ct-staff">0</span></button>
+        <button class="sub-tab" data-sub="guests">🎫 אורחים מאושרים <span class="ct" id="ct-guests">0</span></button>
         <button class="sub-tab" data-sub="blacklist">⛔ רשימה שחורה <span class="ct" id="ct-bl">0</span></button>
       </div>
 
@@ -842,6 +843,10 @@
 
       <div class="sub-pane" data-sub-pane="staff">
         <div class="panel pad" id="gp-staff"></div>
+      </div>
+
+      <div class="sub-pane" data-sub-pane="guests">
+        <div class="panel pad" id="gp-guests"></div>
       </div>
 
       <div class="sub-pane" data-sub-pane="blacklist">
@@ -866,7 +871,8 @@
           <div style="display:flex; align-items:center; gap:10px; margin-bottom: 12px;">
             <h2 style="font-family: var(--font-ui); font-size: 16px;">📱 התקנים פעילים בשטח</h2>
             <span style="flex:1"></span>
-            <button class="btn btn--sm" id="btn-add-user">➕ הנפק משתמש חירום</button>
+            <button class="btn btn--sm btn--primary" id="btn-issue-user">+ הנפק משתמש חדש במערכת</button>
+            <button class="btn btn--sm btn--ghost" id="btn-add-user" title="הנפקת משתמש חירום מהיר ללא תהליך onboarding">⚡ חירום</button>
           </div>
           <div id="devices-list"></div>
         </div>
@@ -1308,7 +1314,11 @@
     document.getElementById('ct-exc').textContent = pending.length;
     document.getElementById('ct-sup').textContent = (ScoutDB.get('vehicles', []) || []).length;
     document.getElementById('ct-bus').textContent = (ScoutDB.get('buses', []) || []).length;
-    document.getElementById('ct-staff').textContent = (ScoutDB.get('staff', []) || []).length;
+    const allStaff = (ScoutDB.get('staff', []) || []);
+    const teamMembers = allStaff.filter(s => !s.guestPass && s.role !== 'guest');
+    const guests = allStaff.filter(s => s.guestPass || s.role === 'guest');
+    document.getElementById('ct-staff').textContent = teamMembers.length;
+    document.getElementById('ct-guests').textContent = guests.length;
     document.getElementById('ct-bl').textContent = (ScoutDB.get('blacklist', []) || []).length;
 
     // Exceptions
@@ -1379,28 +1389,59 @@
       </table>
     `;
 
-    // Staff
+    // Camp Staff & Leadership Team
+    const teamPending = teamMembers.filter(s => s.pendingOnboarding).length;
     document.getElementById('gp-staff').innerHTML = `
       <div class="gates-toolbar">
-        <h2>👤 סגל, הנהגה ואורחים</h2>
-        <span class="chip">${(ScoutDB.get('staff', []) || []).length} פעילים</span>
+        <h2>👥 צוות מחנה והנהגה</h2>
+        <span class="chip">${teamMembers.length} אנשי צוות</span>
+        ${teamPending > 0 ? `<span class="chip chip--warn">${teamPending} ממתינים להפעלה</span>` : ''}
         <span style="flex:1"></span>
-        <button class="btn btn--sm btn--primary" data-action="add-guest">+ הנפק היתר כניסה לאורח</button>
+        <span class="chip chip--demo">צוות מתווסף דרך לשונית "משתמשים והרשאות"</span>
       </div>
       <table class="table">
-        <thead><tr><th>שם</th><th>תפקיד / שיוך</th><th>רכב</th><th>סטטוס</th></tr></thead>
-        <tbody>${(ScoutDB.get('staff', []) || []).map(s => `
+        <thead><tr><th>שם</th><th>תפקיד</th><th>טלפון</th><th>סטטוס Onboarding</th></tr></thead>
+        <tbody>${teamMembers.map(s => {
+          const isPending = s.pendingOnboarding;
+          return `
           <tr>
-            <td><strong>${util.escapeHtml(s.name)}</strong></td>
-            <td>${util.escapeHtml(s.affiliation || UI.ROLE_LABELS[s.role] || s.role)}</td>
-            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(s.plate || '—')}</td>
+            <td><strong>${util.escapeHtml(s.name)}</strong>${isPending ? ` <span style="color: var(--text-low); font-family: var(--font-mono); font-size: 11px;">(${util.escapeHtml(s.tempUsername || '')})</span>` : ''}</td>
+            <td>${util.escapeHtml(UI.ROLE_LABELS[s.role] || s.role)}</td>
+            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(s.phone || '—')}</td>
             <td>
-              ${s.guestPass ? '<span class="chip chip--kabat">🔷 אורח בתיאום קב״ט</span>' :
-                `<span class="chip ${s.active ? 'chip--ok' : 'chip--danger'}">${s.active ? 'פעיל' : 'חסום'}</span>`}
+              ${isPending
+                ? '<span class="chip" style="background: rgba(154,168,188,0.12); color: var(--text-mid); border-color: transparent; font-weight: 700;">⏳ ממתין להפעלה</span>'
+                : `<span class="chip ${s.active ? 'chip--ok' : 'chip--danger'}">${s.active ? '✅ פעיל במחנה' : '⛔ חסום'}</span>`}
               ${s.emergency ? ' <span class="chip chip--warn">חירום</span>' : ''}
             </td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="4" style="text-align: center; color: var(--text-low); padding: 18px;">אין אנשי צוות. הנפק משתמשים בלשונית "משתמשים והרשאות".</td></tr>'}</tbody>
+      </table>
+    `;
+
+    // Approved Entry Guests
+    document.getElementById('gp-guests').innerHTML = `
+      <div class="gates-toolbar">
+        <h2>🎫 אורחים מאושרים כניסה</h2>
+        <span class="chip">${guests.length} אורחים</span>
+        <span style="flex:1"></span>
+        <button class="btn btn--sm btn--primary" data-action="add-guest">+ הוסף אורח מאושר בתיאום</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>שם</th><th>שיוך / סיבת הגעה</th><th>טלפון</th><th>רכב</th><th>סטטוס</th></tr></thead>
+        <tbody>${guests.map(s => `
+          <tr>
+            <td><strong>${util.escapeHtml(s.name)}</strong></td>
+            <td>${util.escapeHtml(s.affiliation || 'אורח')}</td>
+            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(s.phone || '—')}</td>
+            <td style="font-family: var(--font-mono); color: var(--text-mid);">${util.escapeHtml(s.plate || '—')}</td>
+            <td>
+              ${s.checkedInAt
+                ? `<span class="chip chip--info">בתוך המחנה · ${util.fmtTime(s.checkedInAt)}</span>`
+                : '<span class="chip" style="background: rgba(91,141,239,0.18); color: var(--info); border-color: transparent; font-weight: 700;">🔷 אורח בתיאום קב״ט</span>'}
+            </td>
           </tr>
-        `).join('')}</tbody>
+        `).join('') || '<tr><td colspan="5" style="text-align: center; color: var(--text-low); padding: 18px;">אין אורחים מאושרים. לחץ "+ הוסף אורח מאושר בתיאום" כדי להוסיף.</td></tr>'}</tbody>
       </table>
     `;
 
@@ -1591,15 +1632,15 @@
 
   function openAddGuestModal() {
     openFormModal({
-      title: '+ הנפק היתר כניסה לאורח',
-      subtitle: 'יונפק כרטיס אורח דיגיטלי. הש"ג יראה חיווי כחול: "אורח בתיאום קב"ט".',
+      title: '+ הוסף אורח מאושר בתיאום',
+      subtitle: 'רישום מהיר ללא יצירת משתמש. הש"ג יראה את האורח כ"מאושר בתיאום קב"ט".',
       fields: [
-        { name: 'name',        label: 'שם מלא',            required: true, placeholder: 'מאיר כהן' },
-        { name: 'affiliation', label: 'תפקיד / שיוך',      required: true, placeholder: 'הורה של חניך בתיאום' },
-        { name: 'plate',       label: 'מספר רכב',          required: true, placeholder: '99-887-66' },
-        { name: 'phone',       label: 'טלפון',             placeholder: '050-7654321' },
+        { name: 'name',        label: 'שם האורח',          required: true, placeholder: 'מאיר כהן' },
+        { name: 'phone',       label: 'מספר טלפון',         required: true, placeholder: '050-7654321' },
+        { name: 'plate',       label: 'מספר רכב',           required: true, placeholder: '99-887-66' },
+        { name: 'affiliation', label: 'סיבת הגעה / שיוך',   required: true, placeholder: 'הורה של חניך בתיאום' },
       ],
-      submitLabel: 'הנפק היתר',
+      submitLabel: 'אשר אורח',
       onSubmit: (data) => {
         const guest = {
           id: 'st-' + util.uuid().slice(0, 6),
@@ -1618,7 +1659,7 @@
         ScoutDB.set('personnelTelemetry', null);
         ScoutDB.appendAudit({ action: 'GUEST-PASS-ISSUE', channel: 'gate', details: `${data.name} (${data.affiliation}) — רכב ${data.plate}` });
         Bus.emit('bus:guest-issued', guest);
-        Toast.show('כרטיס אורח הונפק. הש"ג יראה אותו כ"אורח בתיאום קב"ט".', { kind: 'ok' });
+        Toast.show('האורח נוסף לרשימת המאושרים בתיאום.', { kind: 'ok' });
         renderGates(); renderKpis();
       },
     });
@@ -1648,29 +1689,41 @@
 
   function renderDevices() {
     const devices = Personnel.devices();
+    const staff = ScoutDB.get('staff', []) || [];
+    const pendingMap = {};
+    staff.forEach(s => { if (s.pendingOnboarding) pendingMap[s.id] = s; });
+
     document.getElementById('devices-list').innerHTML = devices.map(d => {
+      const isPending = !!pendingMap[d.id];
       const batt = d.battery;
       const battCls = batt < 20 ? 'critical' : (batt < 40 ? 'low' : '');
       const lastSeenSec = Math.round((util.nowMs() - d.lastSeenTs) / 1000);
       const lastSeenStr = lastSeenSec < 60 ? `${lastSeenSec}s` : `${Math.round(lastSeenSec/60)}m`;
-      const lsOk = lastSeenSec < 120 && d.active;
+      const lsOk = lastSeenSec < 120 && d.active && !isPending;
+      const tempUser = isPending ? pendingMap[d.id].tempUsername : null;
       return `
-        <div class="device-row">
+        <div class="device-row" ${isPending ? 'style="border-color: rgba(154,168,188,0.4); background: rgba(154,168,188,0.04);"' : ''}>
           <div>
-            <div class="name">${util.escapeHtml(d.name)}</div>
-            <div class="meta">📍 ${util.escapeHtml(d.location)} · <span class="dot dot--${lsOk ? 'ok' : 'danger'}"></span> ${lastSeenStr} ago</div>
+            <div class="name">${util.escapeHtml(d.name)}${isPending ? ` <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-low);">(${util.escapeHtml(tempUser || '')})</span>` : ''}</div>
+            <div class="meta">${isPending
+              ? '⏳ ממתין להפעלה ראשונית · טרם נכנס למערכת'
+              : `📍 ${util.escapeHtml(d.location)} · <span class="dot dot--${lsOk ? 'ok' : 'danger'}"></span> ${lastSeenStr} ago`}</div>
           </div>
-          <select class="role-select" data-set-role="${d.id}">
+          <select class="role-select" data-set-role="${d.id}" ${isPending ? 'disabled' : ''}>
             ${Object.entries(UI.ROLE_LABELS).map(([k, l]) => `<option value="${k}" ${k === d.role ? 'selected' : ''}>${l}</option>`).join('')}
           </select>
           <div class="battery">
-            <div class="battery-bar ${battCls}" style="--w:${batt}%"><style>.battery-bar[style*="--w:${batt}%"]::after{width:${batt}%}</style></div>
-            ${batt}%
+            ${isPending ? '<span style="color: var(--text-low); font-size: 11px;">—</span>' : `
+              <div class="battery-bar ${battCls}" style="--w:${batt}%"><style>.battery-bar[style*="--w:${batt}%"]::after{width:${batt}%}</style></div>
+              ${batt}%
+            `}
           </div>
-          <span class="chip ${d.active ? 'chip--ok' : 'chip--danger'}">${d.active ? 'פעיל' : 'חסום'}</span>
-          ${d.active
-            ? `<button class="btn btn--sm btn--danger" data-block-user="${d.id}">חסום</button>`
-            : `<button class="btn btn--sm btn--ok" data-unblock-user="${d.id}">החזר</button>`}
+          <span class="chip ${isPending ? '' : (d.active ? 'chip--ok' : 'chip--danger')}" ${isPending ? 'style="background: rgba(154,168,188,0.12); color: var(--text-mid); border-color: transparent;"' : ''}>${isPending ? '⏳ ממתין' : (d.active ? 'פעיל' : 'חסום')}</span>
+          ${isPending
+            ? `<button class="btn btn--sm btn--ghost" data-revoke-invite="${tempUser}" title="בטל הזמנה">בטל</button>`
+            : (d.active
+              ? `<button class="btn btn--sm btn--danger" data-block-user="${d.id}">חסום</button>`
+              : `<button class="btn btn--sm btn--ok" data-unblock-user="${d.id}">החזר</button>`)}
           ${d.emergency ? '<span class="chip chip--warn">חירום</span>' : '<span></span>'}
         </div>
       `;
@@ -1729,6 +1782,13 @@
       Toast.show('המשתמש שוחזר.', { kind: 'ok' });
       renderDevices();
     }
+    if (e.target.dataset.revokeInvite) {
+      const u = e.target.dataset.revokeInvite;
+      if (!confirm(`לבטל הזמנת המשתמש ${u}?`)) return;
+      Auth.revokePendingUser(u);
+      Toast.show('ההזמנה בוטלה. ניתן להנפיק חדשה.', { kind: 'warn' });
+      renderDevices(); renderGates(); renderKpis();
+    }
   });
 
   document.getElementById('btn-add-user').addEventListener('click', () => {
@@ -1739,6 +1799,120 @@
     Toast.show('הונפק משתמש חירום זמני.', { kind: 'ok' });
     renderDevices();
   });
+
+  // ===== New user issuance (full Onboarding flow) =====
+  document.getElementById('btn-issue-user').addEventListener('click', openIssueUserModal);
+
+  function openIssueUserModal() {
+    // Step 1: pick role
+    const roleOptions = [
+      'guard','patrol','achmash','kabat',
+      'first-aid','medic','doctor','clinic-chief',
+      'hq-op','hq-shift','tribe',
+      'sanitation','safety','camp-director',
+    ].map(r => ({ value: r, label: UI.ROLE_LABELS[r] || r }));
+
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    host.innerHTML = `
+      <form class="modal" style="width: min(540px, 92vw);">
+        <h3>+ הנפק משתמש חדש במערכת</h3>
+        <p style="color: var(--text-mid); margin: 0 0 18px;">בחר תפקיד למשתמש החדש. המערכת תייצר אוטומטית שם משתמש זמני וסיסמה זמנית להעברה לעובד.</p>
+
+        <div class="form-field">
+          <label>בחירת תפקיד גלובלית *</label>
+          <select class="select" name="role" required>
+            <option value="" disabled selected>— בחר תפקיד —</option>
+            ${roleOptions.map(o => `<option value="${o.value}">${util.escapeHtml(o.label)}</option>`).join('')}
+          </select>
+          <div style="font-size: 11px; color: var(--text-low); margin-top: 6px;">המשתמש יקבל גישה אוטומטית לדשבורד התואם לתפקיד שנבחר.</div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 18px;">
+          <button type="button" class="btn btn--ghost" data-cancel>ביטול</button>
+          <button type="submit" class="btn btn--primary">הנפק</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(host);
+    const form = host.querySelector('form');
+    host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const role = form.role.value;
+      if (!role) return;
+      host.remove();
+      const result = Auth.issueTempUser(role);
+      showIssueResult(result);
+      renderDevices(); renderGates(); renderKpis();
+    });
+    form.role.focus();
+  }
+
+  function showIssueResult({ tempUsername, tempPassword, role }) {
+    const roleLabel = UI.ROLE_LABELS[role] || role;
+    const qrData = encodeURIComponent(JSON.stringify({ u: tempUsername, p: tempPassword }));
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=11161F&color=4DD0E1&margin=8&data=${qrData}`;
+
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    host.innerHTML = `
+      <div class="modal" style="width: min(560px, 92vw);">
+        <div style="text-align: center; color: var(--ok); font-family: var(--font-ui); font-weight: 700; letter-spacing: .18em; text-transform: uppercase; font-size: 12px;">✓ משתמש הונפק בהצלחה</div>
+        <h3 style="text-align: center; margin: 6px 0 4px;">פרטי גישה זמניים</h3>
+        <p style="text-align: center; color: var(--text-mid); margin: 0 0 18px; font-size: 13px;">תפקיד: <strong style="color: var(--accent);">${util.escapeHtml(roleLabel)}</strong></p>
+
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;">
+          <div style="display: grid; gap: 10px;">
+            <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px;">
+              <div style="font-size: 10px; color: var(--text-low); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin-bottom: 4px;">שם משתמש</div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <code style="flex: 1; font-family: var(--font-mono); font-size: 18px; color: var(--accent); font-weight: 700;" id="iss-user">${util.escapeHtml(tempUsername)}</code>
+                <button class="btn btn--sm" data-copy="${util.escapeHtml(tempUsername)}">העתק</button>
+              </div>
+            </div>
+            <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px;">
+              <div style="font-size: 10px; color: var(--text-low); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin-bottom: 4px;">סיסמה זמנית</div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <code style="flex: 1; font-family: var(--font-mono); font-size: 22px; color: var(--warn); font-weight: 700; letter-spacing: .12em;" id="iss-pass">${util.escapeHtml(tempPassword)}</code>
+                <button class="btn btn--sm" data-copy="${util.escapeHtml(tempPassword)}">העתק</button>
+              </div>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 10px; color: var(--text-low); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin-bottom: 6px;">QR לסריקה</div>
+            <img src="${qrUrl}" alt="QR" width="160" height="160" style="border-radius: var(--r-md); background: var(--bg-panel); border: 1px solid var(--border); padding: 6px;" onerror="this.style.display='none'; this.parentNode.innerHTML += '<div style=\\'color: var(--text-low); font-size: 11px; padding: 40px 10px;\\'>QR לא זמין offline</div>';">
+          </div>
+        </div>
+
+        <div style="background: rgba(255,181,71,0.08); border: 1px solid rgba(255,181,71,0.32); border-radius: var(--r-sm); padding: 10px 14px; margin-top: 18px; font-size: 12px;">
+          <strong style="color: var(--warn);">📋 העבר את הפרטים לעובד:</strong>
+          <span style="color: var(--text-mid);"> בכניסה הראשונה ייפתח אצלו טופס חובה לקביעת שם מלא, טלפון וסיסמה קבועה.</span>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:space-between; margin-top: 18px;">
+          <button class="btn btn--ghost" data-copy-both>📋 העתק את שניהם</button>
+          <button class="btn btn--primary" data-close>סגור</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+
+    function copyText(text) {
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => Toast.show('הועתק ✓', { kind: 'ok' }));
+      else {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+        ta.select(); try { document.execCommand('copy'); Toast.show('הועתק ✓', { kind: 'ok' }); } catch (e) {}
+        ta.remove();
+      }
+    }
+    host.addEventListener('click', e => {
+      if (e.target.dataset.copy) copyText(e.target.dataset.copy);
+      if (e.target.dataset.copyBoth) copyText(`שם משתמש: ${tempUsername}\nסיסמה: ${tempPassword}`);
+      if (e.target.dataset.close || e.target === host) host.remove();
+    });
+  }
 
   // ============================================================
   // ===== OVERRIDES TAB =====
@@ -2220,8 +2394,14 @@
   Bus.on('drone:update', renderDrone);
   Bus.on('chat:new', () => { renderChannels(); renderMessages(); updateChatBadge(); });
   Bus.on('chat:groups-updated', () => { renderChannels(); updateChatBadge(); });
-  Bus.on('personnel:update', () => { renderDevices(); renderContacts(); });
+  Bus.on('personnel:update', () => { renderDevices(); renderContacts(); renderGates(); renderKpis(); });
   Bus.on('bus:guest-issued', () => { renderGates(); renderKpis(); renderContacts(); });
+  Bus.on('auth:user-invited', () => { renderDevices(); renderGates(); renderKpis(); });
+  Bus.on('auth:onboarded', payload => {
+    Scout.Audio.play('echo-bell');
+    Toast.show(`✅ המשתמש ${payload.username} הפעיל את חשבונו ונכנס לרשת`, { kind: 'ok' });
+    renderDevices(); renderGates(); renderKpis(); renderContacts();
+  });
 
   UI.bindGlobalSOS({ lock: false });
 

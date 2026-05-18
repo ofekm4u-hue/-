@@ -151,9 +151,14 @@
         <span class="tab-count" data-count="buses">—</span>
       </button>
       <button class="gate-tab" data-tab="staff">
-        <div class="tab-title">👤 סגל ואורחים</div>
-        <div class="tab-meta">רכבי סגל פנימיים</div>
+        <div class="tab-title">👥 צוות מחנה</div>
+        <div class="tab-meta">צוות והנהגה רשמית</div>
         <span class="tab-count" data-count="staff">—</span>
+      </button>
+      <button class="gate-tab" data-tab="guests">
+        <div class="tab-title">🎫 אורחים מאושרים</div>
+        <div class="tab-meta">מבקרים בתיאום קב"ט</div>
+        <span class="tab-count" data-count="guests">—</span>
       </button>
       <button class="gate-tab" data-tab="exceptions">
         <div class="tab-title">⚠ אישורים חריגים</div>
@@ -175,6 +180,7 @@
       <section data-pane="suppliers"></section>
       <section data-pane="buses" hidden></section>
       <section data-pane="staff" hidden></section>
+      <section data-pane="guests" hidden></section>
       <section data-pane="exceptions" hidden></section>
     </main>
   </div>
@@ -297,40 +303,78 @@
     }
   });
 
-  // ----- Staff -----
+  // ----- Camp Staff (team + leadership only) -----
   function renderStaff() {
-    const staff = ScoutDB.get('staff', []);
+    const all = ScoutDB.get('staff', []) || [];
+    const team = all.filter(s => !s.guestPass && s.role !== 'guest');
+    const pendingCount = team.filter(s => s.pendingOnboarding).length;
     const html = `
       <div class="gate-toolbar">
-        <h2 style="font-family: var(--font-ui);">רכבי סגל ואורחים</h2>
-        <span class="chip">${staff.length} פעילים</span>
+        <h2 style="font-family: var(--font-ui);">צוות מחנה והנהגה</h2>
+        <span class="chip">${team.length} אנשי צוות</span>
+        ${pendingCount > 0 ? `<span class="chip" style="background: rgba(154,168,188,0.12); color: var(--text-mid); border-color: transparent;">${pendingCount} ממתינים להפעלה</span>` : ''}
         <span style="flex:1;"></span>
-        <button class="btn btn--sm" id="btn-add-staff">+ הוסף אורח</button>
+        <span class="chip chip--demo">הנפקה דרך מסך הקב"ט</span>
       </div>
-      ${staff.map(s => `
-        <div class="vehicle-card" ${s.kabatCoordinated ? 'style="border-color: var(--info); box-shadow: inset 4px 0 0 var(--info);"' : ''}>
-          <div style="width: 40px; height: 40px; background: ${s.kabatCoordinated ? 'var(--info)' : 'var(--bg-deep)'}; color: ${s.kabatCoordinated ? '#fff' : 'inherit'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; border: 1px solid var(--border);">${util.escapeHtml((s.name.split(' ').slice(-1)[0] || s.name)[0] || '?')}</div>
-          <div class="info">
-            <div class="driver">${util.escapeHtml(s.name)}${s.plate ? ' · <span style="font-family: var(--font-mono); color: var(--text-mid);">' + util.escapeHtml(s.plate) + '</span>' : ''}</div>
-            <div class="vendor">${util.escapeHtml(s.affiliation || UI.ROLE_LABELS[s.role] || s.role)}</div>
-          </div>
-          ${s.kabatCoordinated
-            ? '<span class="chip" style="background: rgba(91,141,239,0.22); color: var(--info); border-color: transparent; font-weight: 700; font-size: 12px;">🔷 אורח בתיאום קב״ט</span>'
-            : `<span class="chip ${s.active ? 'chip--ok' : ''}">${s.active ? 'פעיל' : 'לא פעיל'}</span>`}
-        </div>
-      `).join('')}
+      ${team.length === 0 ? '<div style="text-align:center; padding: 22px; color: var(--text-low);">אין אנשי צוות.</div>' :
+        team.map(s => {
+          const isPending = s.pendingOnboarding;
+          const initial = (s.name.split(' ').slice(-1)[0] || s.name)[0] || '?';
+          return `
+            <div class="vehicle-card" ${isPending ? 'style="border-style: dashed; border-color: var(--text-low);"' : ''}>
+              <div style="width: 40px; height: 40px; background: ${isPending ? 'var(--bg-deep)' : 'var(--ok)'}; color: ${isPending ? 'var(--text-mid)' : '#052817'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; border: 1px solid var(--border);">${util.escapeHtml(initial)}</div>
+              <div class="info">
+                <div class="driver">${util.escapeHtml(s.name)}${isPending ? ` <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-low);">(${util.escapeHtml(s.tempUsername || '')})</span>` : ''}</div>
+                <div class="vendor">${util.escapeHtml(UI.ROLE_LABELS[s.role] || s.role)}${s.phone ? ' · ' + util.escapeHtml(s.phone) : ''}</div>
+              </div>
+              ${isPending
+                ? '<span class="chip" style="background: rgba(154,168,188,0.12); color: var(--text-mid); border-color: transparent; font-weight: 700; font-size: 12px;">⏳ ממתין להפעלה</span>'
+                : '<span class="chip chip--ok" style="font-weight: 700;">✅ פעיל במחנה</span>'}
+            </div>`;
+        }).join('')}
     `;
     document.querySelector('[data-pane="staff"]').innerHTML = html;
-    document.querySelector('[data-count="staff"]').textContent = staff.length;
+    document.querySelector('[data-count="staff"]').textContent = team.length;
   }
+
+  // ----- Approved Entry Guests -----
+  function renderGuests() {
+    const all = ScoutDB.get('staff', []) || [];
+    const guests = all.filter(s => s.guestPass || s.role === 'guest');
+    const html = `
+      <div class="gate-toolbar">
+        <h2 style="font-family: var(--font-ui);">אורחים מאושרים כניסה</h2>
+        <span class="chip">${guests.length} אורחים</span>
+        <span style="flex:1;"></span>
+        <span class="chip chip--demo">הוספה דרך מסך הקב"ט</span>
+      </div>
+      ${guests.length === 0 ? '<div style="text-align:center; padding: 22px; color: var(--text-low);">אין אורחים מאושרים כרגע.</div>' :
+        guests.map(g => {
+          const initial = (g.name.split(' ').slice(-1)[0] || g.name)[0] || '?';
+          return `
+            <div class="vehicle-card" style="border-color: var(--info); box-shadow: inset 4px 0 0 var(--info);">
+              <div style="width: 40px; height: 40px; background: var(--info); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">${util.escapeHtml(initial)}</div>
+              <div class="info">
+                <div class="driver">${util.escapeHtml(g.name)}${g.plate ? ' · <span style="font-family: var(--font-mono); color: var(--text-mid);">' + util.escapeHtml(g.plate) + '</span>' : ''}</div>
+                <div class="vendor">${util.escapeHtml(g.affiliation || 'אורח')}${g.phone ? ' · ' + util.escapeHtml(g.phone) : ''}</div>
+              </div>
+              ${g.checkedInAt
+                ? `<span class="chip chip--info" style="font-weight: 700;">בתוך המחנה · ${util.fmtTime(g.checkedInAt)}</span>`
+                : `<button class="btn btn--ok btn--sm" data-guest-checkin="${g.id}">סמן נכנס</button>`}
+            </div>`;
+        }).join('')}
+    `;
+    document.querySelector('[data-pane="guests"]').innerHTML = html;
+    document.querySelector('[data-count="guests"]').textContent = guests.length;
+  }
+
   document.addEventListener('click', e => {
-    if (e.target.id === 'btn-add-staff') {
-      const name = prompt('שם האורח:');
-      if (!name) return;
-      ScoutDB.patch('staff', l => l.concat([{ id: 'st-' + util.uuid().slice(0, 5), name, role: 'guest', active: true }]));
-      Toast.show('האורח נוסף לרשימה.', { kind: 'ok' });
-      renderStaff();
-    }
+    const id = e.target.dataset.guestCheckin;
+    if (!id) return;
+    ScoutDB.patch('staff', l => l.map(s => s.id === id ? Object.assign({}, s, { checkedInAt: util.nowMs() }) : s));
+    ScoutDB.appendAudit({ action: 'GUEST-CHECKIN', channel: 'gate', details: 'אורח נכנס: ' + id });
+    Toast.show('הכניסה נרשמה.', { kind: 'ok' });
+    renderGuests();
   });
 
   // ----- Exceptions -----
@@ -413,7 +457,10 @@
   // Items added by Kabat in real-time
   Bus.on('bus:vehicle-added', () => { renderSuppliers(); Scout.Audio.play('blip'); Toast.show('ספק חדש התווסף ע"י הקב"ט.', { kind: 'ok' }); });
   Bus.on('bus:bus-added',     () => { renderBuses();     Scout.Audio.play('blip'); Toast.show('אוטובוס חדש בלוח ההיסעים.', { kind: 'ok' }); });
-  Bus.on('bus:guest-issued',  () => { renderStaff();     Scout.Audio.play('blip'); Toast.show('כרטיס אורח הונפק ע"י הקב"ט.', { kind: 'ok' }); });
+  Bus.on('bus:guest-issued',  () => { renderGuests();    renderStaff(); Scout.Audio.play('blip'); Toast.show('אורח חדש מאושר בתיאום קב"ט.', { kind: 'ok' }); });
+  Bus.on('auth:user-invited', () => { renderStaff();     Scout.Audio.play('blip'); Toast.show('משתמש חדש הונפק ע"י הקב"ט (ממתין להפעלה).', { kind: 'ok' }); });
+  Bus.on('auth:onboarded',    payload => { renderStaff(); Scout.Audio.play('echo-bell'); Toast.show(`✅ ${payload.username} הפעיל את חשבונו`, { kind: 'ok' }); });
+  Bus.on('personnel:update',  () => { renderStaff(); renderGuests(); });
 
   UI.bindGlobalSOS({ lock: false });
 
@@ -421,6 +468,7 @@
   renderSuppliers();
   renderBuses();
   renderStaff();
+  renderGuests();
   renderExceptions();
 })();
 </script>
