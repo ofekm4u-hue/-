@@ -601,12 +601,14 @@
         gps: payload.gps || lastKnownPos(payload.entityId),
         acked: false,
         escalated: false,
+        urgency: payload.urgency || 'routine', // routine | complex | critical
+        externalForces: { police: false, mda: false, fire: false },
+        fieldUpdates: [],
       };
       activeEvent = ev;
       ScoutDB.set('activeSOS', ev);
       ScoutDB.appendAudit({ action: 'SOS-TRIGGER', channel: 'sos', details: `${ev.label} — ${ev.who}` });
       Bus.emit('sos:trigger', ev);
-      // Escalate after 2 minutes if no ack
       if (escalationTimer) clearTimeout(escalationTimer);
       escalationTimer = setTimeout(() => escalate(ev.id), 2 * 60 * 1000);
       return ev;
@@ -628,11 +630,67 @@
       ScoutDB.appendAudit({ action: 'SOS-ACK', channel: 'sos', details: 'אושר ע״י ' + ev.ackedBy });
       Bus.emit('sos:ack', ev);
     }
-    function clear() {
+    function setUrgency(level) {
+      const ev = ScoutDB.get('activeSOS', null);
+      if (!ev) return null;
+      const oldLevel = ev.urgency;
+      ev.urgency = level;
+      ScoutDB.set('activeSOS', ev);
+      const labelMap = { routine: 'חריג שגרתי', complex: 'אירוע מורכב', critical: 'סכנת חיים קריטית' };
+      ScoutDB.appendAudit({
+        action: 'SOS-URGENCY', channel: 'sos',
+        details: `דחיפות שונתה ל-${labelMap[level] || level}${oldLevel !== level ? ' (היה ' + (labelMap[oldLevel] || oldLevel) + ')' : ''}`,
+      });
+      Bus.emit('sos:updated', ev);
+      return ev;
+    }
+    function setExternalForce(force, present) {
+      const ev = ScoutDB.get('activeSOS', null);
+      if (!ev) return null;
+      ev.externalForces = ev.externalForces || { police: false, mda: false, fire: false };
+      ev.externalForces[force] = !!present;
+      ScoutDB.set('activeSOS', ev);
+      const labels = { police: 'משטרה', mda: 'מד״א (נט״ן)', fire: 'כיבוי אש' };
+      ScoutDB.appendAudit({
+        action: 'SOS-FORCE', channel: 'sos',
+        details: `${labels[force] || force} ${present ? 'הגיע ליער' : 'הוסר'}`,
+      });
+      Bus.emit('sos:updated', ev);
+      return ev;
+    }
+    function addFieldUpdate(text) {
+      const ev = ScoutDB.get('activeSOS', null);
+      if (!ev || !text) return null;
+      ev.fieldUpdates = ev.fieldUpdates || [];
+      const u = { ts: nowMs(), text: String(text).slice(0, 500), by: UI.currentPersona().name };
+      ev.fieldUpdates.push(u);
+      ScoutDB.set('activeSOS', ev);
+      ScoutDB.appendAudit({ action: 'SOS-FIELD-UPDATE', channel: 'sos', details: u.text });
+      Bus.emit('sos:updated', ev);
+      return u;
+    }
+    function clear(debriefText) {
+      const text = String(debriefText || '').trim();
+      if (text.length < 10) {
+        return { ok: false, error: 'יש להזין תחקיר מינימלי (לפחות 10 תווים) לפני סגירת האירוע.' };
+      }
+      const ev = ScoutDB.get('activeSOS', null);
+      if (ev) {
+        ev.closed = true;
+        ev.closedTs = nowMs();
+        ev.closedBy = UI.currentPersona().name;
+        ev.debrief = text;
+        // Persist to permanent log of closed events
+        ScoutDB.patch('sosArchive', l => (l || []).concat([ev]));
+      }
       ScoutDB.set('activeSOS', null);
-      ScoutDB.appendAudit({ action: 'SOS-CLEAR', channel: 'sos', details: 'אירוע נסגר' });
-      Bus.emit('sos:clear', {});
+      ScoutDB.appendAudit({
+        action: 'SOS-CLOSE', channel: 'sos',
+        details: `אירוע נסגר ע״י ${UI.currentPersona().name}. תחקיר: ${text.slice(0, 200)}`,
+      });
+      Bus.emit('sos:clear', { debrief: text });
       if (escalationTimer) clearTimeout(escalationTimer);
+      return { ok: true };
     }
     function current() { return ScoutDB.get('activeSOS', null); }
     function lastKnownPos(entityId) {
@@ -644,7 +702,7 @@
       return snap.length ? { lat: snap[0].lat, lng: snap[0].lng } : null;
     }
 
-    return { trigger, escalate, ack, clear, current };
+    return { trigger, escalate, ack, clear, current, setUrgency, setExternalForce, addFieldUpdate };
   })();
 
   // ---------- UI helpers ----------
@@ -658,18 +716,40 @@
       'hq-shift':      'אחראי חמ״ל',
       'kabat':         'קב״ט',
       'achmash':       'אחמ״ש',
-      'guard':         'מאבטח ש״ג',
-      'patrol':        'סייר',
+      'guard':         'מאבטח',
+      'patrol':        'מאבטח',
       'tribe':         'מרכז שבט',
       'clinic-chief':  'אחראי מרפאה',
       'medic':         'חובש שטח',
       'first-aid':     'מע״ר',
-      'doctor':        'רופא המחנה',
+      'paramedic':     'פאראמדיק',
+      'doctor':        'רופא מחנה',
       'sanitation':    'תברואן',
       'safety':        'אחראי בטיחות',
+      'provisions':    'מנהל אקונומיה',
       'camp-director': 'מנהל מחנה',
       'national':      'מנהל ארצי',
     };
+
+    // Unified security role — display includes current mission if known
+    const SECURITY_ROLES = ['guard', 'patrol'];
+    function isSecurityRole(role) { return SECURITY_ROLES.includes(role); }
+    function getMission(staffId) {
+      const m = ScoutDB.get('missions', {}) || {};
+      return staffId ? (m[staffId] || null) : null;
+    }
+    function setMission(staffId, mission) {
+      if (!staffId) return;
+      const m = ScoutDB.get('missions', {}) || {};
+      const old = m[staffId];
+      m[staffId] = mission; // 'gate' | 'patrol'
+      ScoutDB.set('missions', m);
+      ScoutDB.appendAudit({
+        action: 'MISSION-SWITCH', channel: 'auth',
+        details: `מאבטח עבר ל-${mission === 'gate' ? 'ש״ג' : 'סיור'}${old ? ' (היה ' + (old === 'gate' ? 'ש״ג' : 'סיור') + ')' : ''}`,
+      });
+      Bus.emit('mission:changed', { staffId, mission });
+    }
 
     function currentPersona() {
       const stored = ScoutDB.get('currentPersona', null);
@@ -797,33 +877,145 @@
     }
     function showSOSLockdown(ev) {
       clearSOSUI();
-      const overlay = document.createElement('div');
-      overlay.dataset.sos = 'lockdown';
-      overlay.style.cssText = `position:fixed; inset:0; background: rgba(120,0,8,0.62); z-index: 240; display:flex; align-items:flex-start; justify-content:center; padding-top: 80px;`;
-      overlay.innerHTML = `
-        <div style="background: var(--bg-panel); border: 2px solid var(--danger); border-radius: var(--r-lg); padding: 28px; width: min(640px, 92vw); box-shadow: 0 30px 80px rgba(0,0,0,.6);">
-          <div style="color: var(--danger); font-family: var(--font-ui); font-weight: 800; letter-spacing:.16em; text-transform: uppercase;">⚠ אירוע חירום פעיל</div>
-          <h2 style="margin: 10px 0 6px;">${escapeHtml(ev.label)}</h2>
-          <div style="color: var(--text-mid); font-size: 14px;">מאת ${escapeHtml(ev.who)} • זמן: ${fmtTime(ev.ts)}</div>
-          ${ev.gps ? `<div style="margin-top:10px; font-family: var(--font-mono); color: var(--text-mid);">📍 GPS: ${ev.gps.lat.toFixed(5)}, ${ev.gps.lng.toFixed(5)}</div>` : ''}
-          <hr style="border:0; border-top: 1px solid var(--border); margin: 18px 0;">
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-            <button class="btn btn--ok btn--lg" data-action="ack">אישור טיפול</button>
-            <button class="btn btn--lg" data-action="page">כריזה למחנה</button>
-            <button class="btn btn--lg" data-action="open">פתח אירוע</button>
-            <button class="btn btn--danger btn--lg" data-action="close">סגור אירוע</button>
+      const urgencyLabel = { routine: 'חריג שגרתי', complex: 'אירוע מורכב', critical: 'סכנת חיים קריטית' }[ev.urgency || 'routine'];
+      const urgencyColor = { routine: 'var(--warn)', complex: 'var(--danger)', critical: '#ff1a2e' }[ev.urgency || 'routine'];
+      const hud = document.createElement('div');
+      hud.dataset.sos = 'lockdown';
+      hud.style.cssText = `
+        position: fixed; top: calc(var(--header-h) + 14px); right: 14px;
+        width: min(380px, calc(100vw - 28px));
+        background: linear-gradient(180deg, rgba(40,8,12,0.96), rgba(15,5,8,0.96));
+        border: 2px solid var(--danger);
+        border-radius: var(--r-lg);
+        padding: 16px 18px;
+        z-index: 240;
+        box-shadow: 0 16px 60px rgba(255,71,87,0.35), 0 0 0 4px rgba(255,71,87,0.12);
+        animation: blink-danger 1.6s infinite;
+        pointer-events: auto;
+      `;
+      hud.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--danger); font-family: var(--font-ui); font-weight: 800; letter-spacing:.14em; font-size: 11px; text-transform: uppercase;">⚠ אירוע חירום פעיל</span>
+          <span style="flex:1;"></span>
+          <span style="font-family: var(--font-mono); color: var(--text-mid); font-size: 11px;">${fmtTime(ev.ts)}</span>
+        </div>
+        <h3 style="font-size: 17px; margin: 8px 0 2px;">${escapeHtml(ev.label)}</h3>
+        <div style="color: var(--text-mid); font-size: 12px;">מאת ${escapeHtml(ev.who)}</div>
+        <div style="margin-top: 10px; padding: 6px 10px; background: rgba(255,71,87,0.12); border-radius: var(--r-sm); display: flex; gap: 8px; align-items: center; font-size: 12px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: ${urgencyColor}; display: inline-block;"></span>
+          <span style="color: ${urgencyColor}; font-weight: 700;" data-urgency-lbl>${urgencyLabel}</span>
+          ${ev.gps ? `<span style="flex:1;"></span><span style="color: var(--text-mid); font-family: var(--font-mono); font-size: 11px;">📍 ${ev.gps.lat.toFixed(4)},${ev.gps.lng.toFixed(4)}</span>` : ''}
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px;">
+          <button class="btn btn--ok btn--sm" data-action="ack">✓ אישור טיפול</button>
+          <button class="btn btn--sm" data-action="manage">🛠 ניהול אירוע</button>
+          <button class="btn btn--sm" data-action="page">📢 כריזה</button>
+          <button class="btn btn--danger btn--sm" data-action="close">✕ סגור אירוע</button>
+        </div>
+        <div style="margin-top: 8px; font-size: 10px; color: var(--text-low); text-align: center;">המפה והכוחות עדיין נראים — תיעוד תחקיר חובה לסגירה</div>
+      `;
+      document.body.appendChild(hud);
+      hud.addEventListener('click', e => {
+        const btn = e.target.closest('[data-action]'); if (!btn) return;
+        const a = btn.dataset.action;
+        if (a === 'ack')    { SOS.ack(); }
+        if (a === 'page')   { Audio.play('voice-prompt', { text: 'התראת חירום, בדוק מסך' }); Toast.show('כריזה נשלחה לכלל המכשירים', { kind: 'warn' }); }
+        if (a === 'manage') { openEventManagement(ev); }
+        if (a === 'close')  { openDebriefModal(ev); }
+      });
+    }
+
+    function openEventManagement(ev) {
+      const host = document.createElement('div');
+      host.className = 'modal-host';
+      host.innerHTML = `
+        <div class="modal" style="width: min(560px, 92vw);">
+          <h3>🛠 ניהול אירוע: ${escapeHtml(ev.label)}</h3>
+          <p style="color: var(--text-mid); margin: 0 0 16px;">פאנל אינטראקטיבי לעדכוני שטח וניווט.</p>
+          <div style="display: grid; gap: 10px;">
+            <button class="btn" data-mng="navigate">📍 נווט למקום האירוע</button>
+            <button class="btn" data-mng="update">📝 הוסף עדכון שטח</button>
+            <button class="btn" data-mng="show-log">📋 הצג יומן אירוע</button>
+            <button class="btn btn--ghost" data-mng="ack">✓ אישור טיפול</button>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 16px;">
+            <button class="btn btn--ghost" data-close>סגור</button>
           </div>
         </div>
       `;
-      document.body.appendChild(overlay);
-      overlay.addEventListener('click', e => {
-        const btn = e.target.closest('[data-action]'); if (!btn) return;
-        const a = btn.dataset.action;
-        if (a === 'ack')   { SOS.ack(); }
-        if (a === 'page')  { Audio.play('voice-prompt', { text: 'התראת חירום, בדוק מסך' }); Toast.show('כריזה נשלחה לכלל המכשירים', { kind: 'warn' }); }
-        if (a === 'open')  { Toast.show('יומן אירוע נפתח (דמו)'); }
-        if (a === 'close') { SOS.clear(); }
+      document.body.appendChild(host);
+      host.addEventListener('click', e => {
+        if (e.target.dataset.close || e.target === host) { host.remove(); return; }
+        const btn = e.target.closest('[data-mng]'); if (!btn) return;
+        const a = btn.dataset.mng;
+        if (a === 'navigate') {
+          if (ev.gps && global.kabatMap && global.kabatMap.setView) {
+            global.kabatMap.setView([ev.gps.lat, ev.gps.lng], 17);
+            Toast.show('המפה התמקדה במקום האירוע.', { kind: 'ok' });
+          } else {
+            Toast.show('אין מיקום GPS לאירוע (או שהמפה לא נטענה).', { kind: 'warn' });
+          }
+          host.remove();
+        }
+        if (a === 'update') {
+          const txt = prompt('הזן עדכון שטח (יישלח ליומן האירוע):');
+          if (txt && txt.trim()) {
+            SOS.addFieldUpdate(txt.trim());
+            Toast.show('העדכון נרשם ביומן.', { kind: 'ok' });
+          }
+          host.remove();
+        }
+        if (a === 'show-log') {
+          host.remove();
+          const cur = SOS.current();
+          const updates = (cur && cur.fieldUpdates) || [];
+          const logHost = document.createElement('div');
+          logHost.className = 'modal-host';
+          logHost.innerHTML = `
+            <div class="modal">
+              <h3>📋 יומן אירוע</h3>
+              <div style="max-height: 360px; overflow-y: auto; background: var(--bg-deep); padding: 12px; border-radius: var(--r-sm); font-family: var(--font-mono); font-size: 12px;">
+                ${updates.length ? updates.map(u => `<div style="padding: 6px 0; border-bottom: 1px solid var(--border-soft);"><span style="color: #66c2d6;">${fmtTime(u.ts)}</span> · <span style="color: var(--accent);">${escapeHtml(u.by)}</span><br>${escapeHtml(u.text)}</div>`).join('') : '<div style="color: var(--text-low); text-align: center; padding: 14px;">אין עדכוני שטח עדיין</div>'}
+              </div>
+              <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 12px;">
+                <button class="btn btn--ghost" data-close>סגור</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(logHost);
+          logHost.addEventListener('click', e => { if (e.target.dataset.close || e.target === logHost) logHost.remove(); });
+        }
+        if (a === 'ack') { SOS.ack(); host.remove(); }
       });
+    }
+
+    function openDebriefModal(ev) {
+      const host = document.createElement('div');
+      host.className = 'modal-host';
+      host.innerHTML = `
+        <div class="modal" style="width: min(560px, 92vw);">
+          <div style="color: var(--danger); font-family: var(--font-ui); font-weight: 800; letter-spacing:.16em; text-transform: uppercase; font-size: 11px;">🔒 תחקיר חובה</div>
+          <h3 style="margin: 6px 0 4px;">סגירת אירוע: ${escapeHtml(ev.label)}</h3>
+          <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">לפני שניתן לסגור את האירוע, יש לתעד תחקיר משפטי קצר ("סיבת הפעלה וסיכום טיפול"). הטקסט יישמר באופן בלתי הפיך בלוג.</p>
+          <textarea class="textarea" id="debrief-text" rows="6" placeholder="לדוגמה: התראת SOS הופעלה ע״י סייר 2 לאחר חשד לפריצה בגדר. בדיקה הראתה ענף שנפל ושיבר את הגדר. הצוות תיקן בשטח. אין נפגעים." style="width:100%; resize: vertical;"></textarea>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-low);">מינימום 10 תווים. הטקסט יישלח ללוג המשפטי ולא ניתן יהיה לערוך אותו.</div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 16px;">
+            <button type="button" class="btn btn--ghost" data-cancel>ביטול</button>
+            <button type="button" class="btn btn--danger" data-confirm>סגור אירוע סופית</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(host);
+      const ta = host.querySelector('#debrief-text');
+      ta.focus();
+      host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
+      host.querySelector('[data-confirm]').addEventListener('click', () => {
+        const result = SOS.clear(ta.value);
+        if (!result.ok) { Toast.show(result.error, { kind: 'warn' }); return; }
+        Toast.show('האירוע נסגר ותועד בלוג המשפטי.', { kind: 'ok' });
+        host.remove();
+      });
+      host.addEventListener('click', e => { if (e.target === host) {/* don't close — mandatory */} });
     }
     function clearSOSUI() {
       document.querySelectorAll('[data-sos]').forEach(el => el.remove());
@@ -837,6 +1029,7 @@
       bindGlobalSOS,
       showSOSBanner, showSOSLockdown, clearSOSUI,
       ROLE_LABELS,
+      isSecurityRole, getMission, setMission,
     };
   })();
 
@@ -1082,10 +1275,40 @@
       return true;
     }
 
+    function deleteUser(staffId) {
+      // Hard-delete: remove staff record + any credential that points to it
+      if (!staffId) return { ok: false, error: 'staffId required' };
+      const staff = ScoutDB.get('staff', []) || [];
+      const target = staff.find(s => s.id === staffId);
+      if (!target) return { ok: false, error: 'משתמש לא נמצא' };
+      // Cannot delete self
+      const currentStaff = (UI.currentPersona() || {}).staffId;
+      if (currentStaff === staffId) return { ok: false, error: 'אי אפשר למחוק את החשבון המחובר כעת' };
+      // Remove credentials pointing to this staffId
+      const creds = getCreds();
+      let removedCred = null;
+      Object.keys(creds).forEach(k => {
+        if (creds[k].staffId === staffId) { removedCred = k; delete creds[k]; }
+      });
+      setCreds(creds);
+      // Remove staff
+      ScoutDB.patch('staff', l => (l || []).filter(s => s.id !== staffId));
+      ScoutDB.set('personnelTelemetry', null);
+      // Clean up mission state
+      const missions = ScoutDB.get('missions', {}) || {};
+      if (missions[staffId]) { delete missions[staffId]; ScoutDB.set('missions', missions); }
+      ScoutDB.appendAudit({
+        action: 'USER-DELETE', channel: 'auth',
+        details: `נמחק: ${target.name} (${UI.ROLE_LABELS[target.role] || target.role})${removedCred ? ' · cred ' + removedCred : ''}`,
+      });
+      Bus.emit('personnel:update', { staffId, deleted: true });
+      return { ok: true };
+    }
+
     return {
       login, logout, isLoggedIn, isPending, requireLogin, routeForRole,
       listDemoUsers, issueTempUser, completeOnboarding,
-      getPendingUsers, revokePendingUser,
+      getPendingUsers, revokePendingUser, deleteUser,
     };
   })();
 
