@@ -193,9 +193,100 @@
 
   if (!Auth.requireLogin()) return;
 
-  document.getElementById('header').innerHTML = UI.header({ title: 'מאבטח ש"ג — שער ראשי' });
+  // ===== Mission picker (unified security role) =====
+  const persona = UI.currentPersona();
+  let currentMission = UI.isSecurityRole(persona.role) ? UI.getMission(persona.staffId) : null;
+
+  function showMissionPicker(opts) {
+    opts = opts || {};
+    return new Promise(resolve => {
+      const host = document.createElement('div');
+      host.className = 'modal-host';
+      host.innerHTML = `
+        <div class="modal" style="width: min(520px, 92vw); text-align: center;">
+          <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; margin-bottom: 4px;">${opts.title || 'בחר משימה למשמרת זו'}</div>
+          <h2 style="margin: 4px 0 6px;">מערך אבטחה אחוד</h2>
+          <p style="color: var(--text-mid); margin: 0 0 22px; font-size: 13px;">המאבטח הוא יישות אחת. בחר במשימה הנוכחית — ניתן להחליף במהלך המשמרת.</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <button class="btn btn--lg" data-mission="gate" style="height: 110px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 32px;">⛩</span>
+              <span style="font-family: var(--font-ui); font-weight: 700; font-size: 16px;">ש"ג (שער)</span>
+              <span style="font-size: 11px; color: var(--text-mid); font-weight: 400;">טבלאות רכבים, סורק תעודות, אישורים</span>
+            </button>
+            <button class="btn btn--lg" data-mission="patrol" style="height: 110px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 32px;">🚶</span>
+              <span style="font-family: var(--font-ui); font-weight: 700; font-size: 16px;">סיור (שטח)</span>
+              <span style="font-size: 11px; color: var(--text-mid); font-weight: 400;">נקודות ציון, צ׳ק-ליסט סבב, דיווח מפגעים</span>
+            </button>
+          </div>
+          ${opts.allowCancel ? '<div style="margin-top: 14px;"><button class="btn btn--ghost btn--sm" data-cancel>ביטול</button></div>' : ''}
+        </div>
+      `;
+      document.body.appendChild(host);
+      host.addEventListener('click', e => {
+        if (e.target.dataset.cancel) { host.remove(); resolve(null); return; }
+        const btn = e.target.closest('[data-mission]');
+        if (!btn) return;
+        const m = btn.dataset.mission;
+        if (persona.staffId) UI.setMission(persona.staffId, m);
+        currentMission = m;
+        host.remove();
+        resolve(m);
+      });
+    });
+  }
+
+  function applyMissionLayout() {
+    // Layout differences:
+    // - Gate mission: suppliers/buses/staff/guests/exceptions tabs visible
+    // - Patrol mission: only patrol-relevant content
+    const gateTabIds = ['suppliers', 'buses', 'staff', 'guests', 'exceptions'];
+    if (currentMission === 'patrol') {
+      // Hide tabs and show patrol view
+      document.querySelector('.gate-tabs').style.display = 'none';
+      document.querySelector('.gate-content').innerHTML = renderPatrolView();
+      bindPatrolView();
+    } else {
+      document.querySelector('.gate-tabs').style.display = '';
+      // Restore the gate panes (they're static in HTML; if patrol was rendered we'd need to restore)
+      // For initial load, the panes are already there.
+    }
+  }
+
+  // Determine if persona needs mission picker
+  const needsPicker = UI.isSecurityRole(persona.role) && !currentMission;
+
+  document.getElementById('header').innerHTML = UI.header({
+    title: currentMission === 'patrol' ? 'מאבטח — משמרת סיור' : 'מאבטח — משמרת ש"ג',
+    subtitle: persona.staffId && currentMission ? (currentMission === 'gate' ? '⛩ ש"ג' : '🚶 סיור') : null,
+  });
   UI.bindHeader(document.body);
   UI.mockBadge('דמו פרזנטציה');
+
+  // Add mission-switch button to header for security personas
+  if (UI.isSecurityRole(persona.role)) {
+    const switchBtn = document.createElement('button');
+    switchBtn.className = 'btn btn--sm';
+    switchBtn.style.cssText = 'margin: 0 6px;';
+    switchBtn.textContent = '🔄 החלף משימה';
+    switchBtn.title = 'החלף בין ש"ג לסיור באמצע המשמרת';
+    switchBtn.addEventListener('click', async () => {
+      const m = await showMissionPicker({ title: 'החלפת משימה', allowCancel: true });
+      if (m) {
+        Toast.show(`המשימה הוחלפה ל-${m === 'gate' ? 'ש"ג' : 'סיור'}`, { kind: 'ok' });
+        setTimeout(() => location.reload(), 500);
+      }
+    });
+    const headerEl = document.querySelector('.header');
+    const logoutBtn = headerEl.querySelector('[data-logout]');
+    if (logoutBtn) headerEl.insertBefore(switchBtn, logoutBtn);
+    else headerEl.appendChild(switchBtn);
+  }
+
+  if (needsPicker) {
+    showMissionPicker().then(() => location.reload());
+    return;
+  }
 
   // Allow URL flag to demo DMS quickly
   if (util.getParam('dms') === 'on') {
@@ -428,19 +519,124 @@
     }
   });
 
-  // ----- Request exception -----
+  // ----- Request exception (dynamic form) -----
   document.getElementById('btn-request-exception').addEventListener('click', () => {
-    const plate = prompt('מספר רכב חריג (לדוגמה: 99-887-66):', '99-887-66');
-    if (!plate) return;
-    const reason = prompt('סיבה לבקשה:', 'אורח לא מתואם — נטען שהוזמן ע"י סגל');
-    const id = util.uuid().slice(0, 8);
-    const item = { id, plate, reason, who: 'בקשת ש"ג ' + UI.currentPersona().name, ts: util.nowMs(), resolved: false };
-    ScoutDB.patch('gateExceptions', l => (l || []).concat([item]));
-    Bus.emit('bus:gate-exception', item);
-    ScoutDB.appendAudit({ action: 'GATE-EXCEPTION-REQ', channel: 'gate', details: `${plate} — ${reason}` });
-    Toast.show('הבקשה נשלחה לקב"ט וחמ"ל.', { kind: 'warn' });
-    renderExceptions();
+    openDynamicExceptionForm();
   });
+
+  function openDynamicExceptionForm() {
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    host.innerHTML = `
+      <form class="modal" style="width: min(560px, 92vw);">
+        <h3>⚠ בקשת אישור כניסה חריגה</h3>
+        <p style="color: var(--text-mid); margin: 0 0 14px;">בחר סוג הישות והשדות יתעדכנו דינמית. הבקשה תישלח לקב"ט / חמ"ל.</p>
+
+        <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 4px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 16px;" id="entity-picker">
+          <button type="button" class="btn btn--sm btn--primary" data-entity="supplier">🚚 ספק</button>
+          <button type="button" class="btn btn--sm" data-entity="guest">🎫 אורח</button>
+          <button type="button" class="btn btn--sm" data-entity="staff">👥 איש צוות</button>
+        </div>
+
+        <div id="exc-fields"></div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 16px;">
+          <button type="button" class="btn btn--ghost" data-cancel>ביטול</button>
+          <button type="submit" class="btn btn--primary">שלח לקב"ט</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(host);
+    const form = host.querySelector('form');
+    let entityType = 'supplier';
+
+    const FORMS = {
+      supplier: [
+        { name: 'company', label: 'שם החברה / ספק', required: true, placeholder: 'אקונומיה אלפא' },
+        { name: 'driver',  label: 'שם הנהג', required: true },
+        { name: 'phone',   label: 'טלפון', required: true, placeholder: '050-1234567' },
+        { name: 'plate',   label: 'לוחית רישוי המשאית', required: true, placeholder: '12-345-67' },
+        { name: 'destination', label: 'למי / לאיזו מחלקה הגיע האספקה', required: true, type: 'select', options: [
+          { value: 'economy',    label: 'אקונומיה' },
+          { value: 'sanitation', label: 'תברואה' },
+          { value: 'logistics',  label: 'מנהלה / לוגיסטיקה' },
+        ]},
+      ],
+      guest: [
+        { name: 'name',    label: 'שם האורח', required: true, placeholder: 'מאיר כהן' },
+        { name: 'phone',   label: 'טלפון', required: true, placeholder: '050-7654321' },
+        { name: 'reason',  label: 'סיבת הגעה', required: true, placeholder: 'הורה בא לאסוף חניך' },
+        { name: 'plate',   label: 'מספר רכב (אופציונלי)', required: false, placeholder: 'לא חובה' },
+      ],
+      staff: [
+        { name: 'name',     label: 'שם איש הצוות', required: true, placeholder: 'יוסי לוי' },
+        { name: 'tribe',    label: 'שבט המקור', required: true, placeholder: 'נחל' },
+        { name: 'role',     label: 'תפקיד תנועתי במחנה', required: true, placeholder: 'מדריך מוסמך' },
+        { name: 'phone',    label: 'טלפון', required: true },
+        { name: 'plate',    label: 'מספר רכב (אופציונלי)', required: false },
+      ],
+    };
+
+    function renderFields() {
+      const fields = FORMS[entityType];
+      document.getElementById('exc-fields').innerHTML = fields.map(f => {
+        if (f.type === 'select') {
+          return `<div class="form-field" style="margin-bottom: 10px;">
+            <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px;">${f.label}${f.required ? ' *' : ''}</label>
+            <select class="select" name="${f.name}" ${f.required ? 'required' : ''}>${f.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('')}</select>
+          </div>`;
+        }
+        return `<div class="form-field" style="margin-bottom: 10px;">
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px;">${f.label}${f.required ? ' *' : ''}</label>
+          <input class="input" type="${f.type || 'text'}" name="${f.name}" ${f.required ? 'required' : ''} ${f.placeholder ? `placeholder="${f.placeholder}"` : ''}>
+        </div>`;
+      }).join('');
+    }
+    renderFields();
+
+    host.querySelectorAll('[data-entity]').forEach(b => b.addEventListener('click', () => {
+      host.querySelectorAll('[data-entity]').forEach(x => { x.classList.remove('btn--primary'); });
+      b.classList.add('btn--primary');
+      entityType = b.dataset.entity;
+      renderFields();
+    }));
+
+    host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const fields = FORMS[entityType];
+      const data = {};
+      for (const f of fields) {
+        data[f.name] = (form.elements[f.name].value || '').trim();
+      }
+      // Build description from entity type
+      const labels = { supplier: 'ספק', guest: 'אורח', staff: 'איש צוות' };
+      let summary = '';
+      let plate = data.plate || null;
+      if (entityType === 'supplier') {
+        const destLabel = (FORMS.supplier.find(x => x.name === 'destination').options.find(o => o.value === data.destination) || {}).label || data.destination;
+        summary = `🚚 ${data.company} · נהג ${data.driver} · ל-${destLabel}`;
+      } else if (entityType === 'guest') {
+        summary = `🎫 ${data.name} · ${data.reason}`;
+      } else {
+        summary = `👥 ${data.name} · ${data.tribe} · ${data.role}`;
+      }
+      const id = util.uuid().slice(0, 8);
+      const item = {
+        id, plate, reason: summary, entityType, data,
+        who: 'בקשת ש"ג ' + UI.currentPersona().name,
+        ts: util.nowMs(), resolved: false,
+      };
+      ScoutDB.patch('gateExceptions', l => (l || []).concat([item]));
+      Bus.emit('bus:gate-exception', item);
+      ScoutDB.appendAudit({ action: 'GATE-EXCEPTION-REQ', channel: 'gate', details: `[${labels[entityType]}] ${summary}` });
+      Toast.show('הבקשה נשלחה לקב"ט וחמ"ל.', { kind: 'warn' });
+      host.remove();
+      renderExceptions();
+    });
+  }
 
   // Cross-tab resolution from kabat/hq
   Bus.on('bus:gate-exception:resolved', payload => {
@@ -464,12 +660,110 @@
 
   UI.bindGlobalSOS({ lock: false });
 
-  // Initial render
-  renderSuppliers();
-  renderBuses();
-  renderStaff();
-  renderGuests();
-  renderExceptions();
+  // ===== Patrol View (alternate UI for security in patrol mode) =====
+  function renderPatrolView() {
+    const waypoints = ScoutDB.get('patrolWaypoints', null) || [
+      { id: 'wp1', name: 'סריקת שבט נחל',     visited: false },
+      { id: 'wp2', name: 'גדר היקפית — צפון',  visited: false },
+      { id: 'wp3', name: 'גדר היקפית — דרום',  visited: false },
+      { id: 'wp4', name: 'שער ראשי',           visited: true },
+      { id: 'wp5', name: 'מתחם אקונומיה',     visited: false },
+      { id: 'wp6', name: 'מגדל תצפית',         visited: false },
+    ];
+    if (!ScoutDB.get('patrolWaypoints', null)) ScoutDB.set('patrolWaypoints', waypoints);
+    const checklist = ScoutDB.get('patrolChecklist', null) || [
+      { id: 'c1', label: 'בדיקת נעילת שערים',        done: false },
+      { id: 'c2', label: 'תקינות תאורת היקף',         done: false },
+      { id: 'c3', label: 'נוכחות שומרים בעמדה',       done: true },
+      { id: 'c4', label: 'בדיקת מטפי כיבוי',           done: false },
+      { id: 'c5', label: 'דיווח מפגעים בנקודות חשד', done: false },
+    ];
+    if (!ScoutDB.get('patrolChecklist', null)) ScoutDB.set('patrolChecklist', checklist);
+    const visited = waypoints.filter(w => w.visited).length;
+    const done = checklist.filter(c => c.done).length;
+    return `
+      <div style="padding: 14px;">
+        <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 14px;">
+          <div style="font-family: var(--font-ui); font-weight: 800; font-size: 18px; margin-bottom: 4px;">🚶 משמרת סיור פעילה</div>
+          <div style="color: var(--text-mid); font-size: 13px;">${visited}/${waypoints.length} נקודות ציון · ${done}/${checklist.length} משימות סבב</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="panel" style="padding: 14px;">
+            <div style="font-family: var(--font-ui); font-weight: 700; margin-bottom: 10px;">📍 נקודות ציון לסבב</div>
+            <div style="display: grid; gap: 6px;">
+              ${waypoints.map(w => `
+                <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${w.visited ? 'rgba(45,216,129,0.1)' : 'var(--bg-deep)'}; border: 1px solid ${w.visited ? 'var(--ok)' : 'var(--border)'}; border-radius: var(--r-sm); cursor: pointer;">
+                  <input type="checkbox" data-wp="${w.id}" ${w.visited ? 'checked' : ''} style="accent-color: var(--ok); width: 18px; height: 18px;">
+                  <span style="${w.visited ? 'color: var(--ok);' : ''}">${util.escapeHtml(w.name)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="panel" style="padding: 14px;">
+            <div style="font-family: var(--font-ui); font-weight: 700; margin-bottom: 10px;">📋 צ׳ק-ליסט סבב</div>
+            <div style="display: grid; gap: 6px;">
+              ${checklist.map(c => `
+                <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${c.done ? 'rgba(77,208,225,0.1)' : 'var(--bg-deep)'}; border: 1px solid ${c.done ? 'var(--accent)' : 'var(--border)'}; border-radius: var(--r-sm); cursor: pointer;">
+                  <input type="checkbox" data-task="${c.id}" ${c.done ? 'checked' : ''} style="accent-color: var(--accent); width: 18px; height: 18px;">
+                  <span style="${c.done ? 'color: var(--accent); text-decoration: line-through;' : ''}">${util.escapeHtml(c.label)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button class="btn btn--lg" id="btn-report-hazard">📸 דיווח מפגע מהיר</button>
+          <button class="btn btn--danger btn--lg" id="btn-patrol-sos">🚨 הפעלת SOS חירום</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindPatrolView() {
+    document.querySelectorAll('[data-wp]').forEach(cb => cb.addEventListener('change', () => {
+      ScoutDB.patch('patrolWaypoints', l => l.map(w => w.id === cb.dataset.wp ? Object.assign({}, w, { visited: cb.checked }) : w));
+      ScoutDB.appendAudit({ action: 'PATROL-WP', channel: 'gate', details: `${cb.checked ? 'הגיע ל' : 'בוטל'} נקודת ציון ${cb.dataset.wp}` });
+      document.querySelector('.gate-content').innerHTML = renderPatrolView();
+      bindPatrolView();
+    }));
+    document.querySelectorAll('[data-task]').forEach(cb => cb.addEventListener('change', () => {
+      ScoutDB.patch('patrolChecklist', l => l.map(t => t.id === cb.dataset.task ? Object.assign({}, t, { done: cb.checked }) : t));
+      ScoutDB.appendAudit({ action: 'PATROL-TASK', channel: 'gate', details: cb.dataset.task });
+      document.querySelector('.gate-content').innerHTML = renderPatrolView();
+      bindPatrolView();
+    }));
+    const reportBtn = document.getElementById('btn-report-hazard');
+    if (reportBtn) reportBtn.addEventListener('click', () => {
+      const desc = prompt('תיאור המפגע (יישלח לחמ"ל עם המיקום הנוכחי):');
+      if (!desc || !desc.trim()) return;
+      ScoutDB.patch('hazards', l => (l || []).concat([{ id: util.uuid().slice(0,6), desc, ts: util.nowMs(), reportedBy: UI.currentPersona().name }]));
+      Bus.emit('bus:hazard', { desc, ts: util.nowMs() });
+      ScoutDB.appendAudit({ action: 'HAZARD-REPORT', channel: 'gate', details: desc });
+      Scout.Audio.play('pulse-alert');
+      Toast.show('המפגע דווח לחמ"ל.', { kind: 'warn' });
+    });
+    const sosBtn = document.getElementById('btn-patrol-sos');
+    if (sosBtn) sosBtn.addEventListener('click', () => {
+      if (!confirm('להפעיל אירוע SOS? פעולה זו תתריע לחמ"ל ולקב"ט.')) return;
+      SOS.trigger({ source: 'patrol-manual', label: 'מאבטח בסיור — אירוע SOS', who: UI.currentPersona().name });
+    });
+  }
+
+  // ===== Initial render — depends on mission =====
+  if (currentMission === 'patrol') {
+    document.querySelector('.gate-tabs').style.display = 'none';
+    document.querySelector('.gate-content').innerHTML = renderPatrolView();
+    bindPatrolView();
+  } else {
+    renderSuppliers();
+    renderBuses();
+    renderStaff();
+    renderGuests();
+    renderExceptions();
+  }
 })();
 </script>
 </body>

@@ -820,6 +820,11 @@
     <!-- Tab: Gates & Lists -->
     <!-- ============================================================ -->
     <section class="tab-pane" data-pane="gates">
+      <div style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+        <span style="color: var(--text-mid); font-family: var(--font-ui); font-size: 13px; font-weight: 700;">🔍 חיפוש מהיר</span>
+        <input class="input" id="gates-search" type="search" placeholder="שם, מספר רכב או שם חברה — סינון חי בלשונית הפעילה..." style="flex:1; height: 36px; font-size: 13px;" autocomplete="off">
+        <span class="chip chip--demo" id="gates-search-hint" hidden>0 תוצאות</span>
+      </div>
       <div class="sub-tab-row" id="gates-sub-tabs">
         <button class="sub-tab is-active" data-sub="exceptions">⚠ ממתינים לאישור <span class="ct" id="ct-exc">0</span></button>
         <button class="sub-tab" data-sub="suppliers">🚚 ספקים <span class="ct" id="ct-sup">0</span></button>
@@ -912,13 +917,20 @@
           </div>
 
           <div class="ov-card">
-            <div class="ov-title">🚨 השתקה ונטרול SOS</div>
+            <div class="ov-title">🚨 פאנל ניהול אירוע SOS</div>
             <p style="color: var(--text-mid); font-size: 13px; margin-bottom: 12px;">
-              סמכות בלעדית לאפס או לסגור אירוע SOS פעיל לאחר טיפול בשטח.
+              שליטה מלאה על אירוע פעיל: דחיפות, כוחות חיצוניים, ופרוטוקול סגירה.
             </p>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+
+            <div id="sos-mgmt-panel">
+              <div style="padding: 12px; background: var(--bg-elev); border-radius: var(--r-sm); text-align: center; color: var(--text-low);">
+                אין אירוע SOS פעיל. הפאנל יוצג ברגע שאירוע יופעל.
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
               <button class="btn btn--ok" id="btn-ack-sos">✅ אישור טיפול</button>
-              <button class="btn btn--danger" id="btn-clear-sos">⛔ סגור אירוע</button>
+              <button class="btn btn--danger" id="btn-clear-sos">⛔ סגור אירוע (תחקיר חובה)</button>
             </div>
           </div>
         </div>
@@ -1181,6 +1193,7 @@
     Geo.start(forestId);
 
     map = L.map('kabat-map', { zoomControl: true }).setView([forest.lat, forest.lng], 15);
+    window.kabatMap = map;
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       attribution: '&copy; OSM &middot; CARTO',
@@ -1284,7 +1297,7 @@
     const interval = ScoutDB.get('dmsInterval', 15);
     document.getElementById('dms-rate').textContent = interval;
     document.getElementById('dms-list').innerHTML = guards.map(g => `
-      <div class="dms-guard ${g.status === 'fail' ? 'is-fail' : ''}">
+      <div class="dms-guard ${g.status === 'fail' ? 'is-fail' : ''}" data-dms-guard="${g.id}" style="cursor: pointer; transition: background var(--t-fast);" title="לחץ לפעולות מהירות">
         <div>
           <div class="name">${g.name}</div>
           <div class="meta">ערנות אחרונה: לפני ${g.sinceAckMin} דק'</div>
@@ -1294,6 +1307,100 @@
         }</span>
       </div>
     `).join('');
+  }
+
+  // DMS context menu — open on click
+  document.getElementById('dms-list').addEventListener('click', e => {
+    const row = e.target.closest('[data-dms-guard]');
+    if (!row) return;
+    const id = row.dataset.dmsGuard;
+    const guard = dmsState().find(g => g.id === id);
+    if (!guard) return;
+    openDmsActions(guard, row);
+  });
+
+  function openDmsActions(guard, anchor) {
+    // Remove any existing popover
+    document.querySelectorAll('[data-dms-popover]').forEach(p => p.remove());
+    const rect = anchor.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.dataset.dmsPopover = '1';
+    pop.style.cssText = `
+      position: fixed;
+      top: ${rect.bottom + 6}px;
+      right: ${Math.max(8, window.innerWidth - rect.right)}px;
+      width: 260px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--r-md);
+      box-shadow: var(--shadow-hi);
+      z-index: 250;
+      padding: 6px;
+      animation: fade-in 160ms var(--ease);
+    `;
+    const isFail = guard.status === 'fail';
+    pop.innerHTML = `
+      <div style="padding: 8px 10px; border-bottom: 1px solid var(--border-soft); margin-bottom: 4px;">
+        <div style="font-family: var(--font-ui); font-weight: 700;">${guard.name}</div>
+        <div style="font-size: 11px; color: var(--text-mid);">${isFail ? '⚠ כשל ערנות — נדרשת התערבות' : 'מצב: ' + (guard.status === 'ok' ? 'תקין' : 'מתעכב')}</div>
+      </div>
+      <button class="btn btn--block btn--sm" data-dms-act="locate" style="justify-content: flex-start; margin-bottom: 3px;">📍 נווט למיקום האחרון</button>
+      <button class="btn btn--block btn--sm" data-dms-act="push" style="justify-content: flex-start; margin-bottom: 3px; ${isFail ? 'background: var(--danger); color: #fff; border-color: var(--danger);' : ''}">🚨 שלח הודעה מתפרצת</button>
+      <button class="btn btn--block btn--sm" data-dms-act="call" style="justify-content: flex-start; margin-bottom: 3px;">📞 חיוג מהיר</button>
+      <button class="btn btn--block btn--sm" data-dms-act="dm" style="justify-content: flex-start; margin-bottom: 3px;">💬 פתח שיחה פרטית</button>
+      <button class="btn btn--block btn--sm btn--ghost" data-dms-act="dismiss" style="justify-content: flex-start;">❌ ביטול</button>
+    `;
+    document.body.appendChild(pop);
+    function close() { pop.remove(); document.removeEventListener('click', outsideClick, true); }
+    function outsideClick(e) { if (!pop.contains(e.target)) close(); }
+    setTimeout(() => document.addEventListener('click', outsideClick, true), 0);
+    pop.addEventListener('click', e => {
+      const btn = e.target.closest('[data-dms-act]');
+      if (!btn) return;
+      const a = btn.dataset.dmsAct;
+      if (a === 'dismiss') { close(); return; }
+      if (a === 'locate') {
+        const snap = Geo.snapshot();
+        const ent = snap.find(x => x.id === guard.id);
+        if (ent && window.kabatMap) {
+          window.kabatMap.setView([ent.lat, ent.lng], 17);
+          // Drop a temp highlight marker
+          if (window._dmsHighlight) window.kabatMap.removeLayer(window._dmsHighlight);
+          window._dmsHighlight = L.circleMarker([ent.lat, ent.lng], { radius: 18, color: '#FF4757', fillColor: '#FF4757', fillOpacity: 0.3, weight: 2 }).addTo(window.kabatMap);
+          setTimeout(() => { if (window._dmsHighlight) { window.kabatMap.removeLayer(window._dmsHighlight); window._dmsHighlight = null; } }, 8000);
+          // Switch to Map tab
+          document.querySelector('.tab-btn[data-tab="map"]').click();
+          Toast.show(`המפה ממוקדת על ${guard.name}. סימן עזרה כתום מהבהב למשך 8 שניות.`, { kind: 'ok' });
+        } else {
+          Toast.show('מיקום GPS לא זמין או המפה לא נטענה.', { kind: 'warn' });
+        }
+        ScoutDB.appendAudit({ action: 'DMS-LOCATE', channel: 'dms', details: `נווט למיקום ${guard.name}` });
+        close();
+      }
+      if (a === 'push') {
+        Scout.Audio.play('tactical-siren', { durationMs: 2500 });
+        Bus.emit('bus:broadcast', { text: `🚨 דרישת ערנות מיידית: ${guard.name}, בדוק עמדה!`, targetId: guard.id, ts: util.nowMs() });
+        ScoutDB.appendAudit({ action: 'DMS-PUSH', channel: 'dms', details: `הודעה מתפרצת ל-${guard.name}` });
+        Toast.show(`הודעה אגרסיבית נשלחה ל-${guard.name} עם צליל בעוצמה מקסימלית.`, { kind: 'danger' });
+        close();
+      }
+      if (a === 'call') {
+        ScoutDB.appendAudit({ action: 'DMS-CALL', channel: 'dms', details: `חיוג ל-${guard.name}` });
+        Toast.show(`חיוג ל-${guard.name}... (דמו — בקוד אמיתי tel: link)`, { kind: 'ok' });
+        close();
+      }
+      if (a === 'dm') {
+        const me = (UI.currentPersona() || {}).staffId;
+        if (!me) { Toast.show('הזדהות חסרה', { kind: 'warn' }); close(); return; }
+        const dm = Chat.openDM(me, guard.id);
+        activeChannel = dm.id;
+        document.querySelector('.tab-btn[data-tab="chat"]').click();
+        document.querySelector('.chat-side-tab[data-side-tab="channels"]').click();
+        renderChannels(); renderMessages();
+        Toast.show(`שיחה פרטית עם ${guard.name} נפתחה.`, { kind: 'ok' });
+        close();
+      }
+    });
   }
 
   // ============================================================
@@ -1460,6 +1567,9 @@
             </tr>
           `).join('')}</tbody>
         </table>`;
+
+    // Re-apply search filter after re-render
+    try { applyGatesFilter(); } catch (e) { /* search not yet initialized */ }
   }
 
   document.addEventListener('click', e => {
@@ -1501,6 +1611,41 @@
     if (t.dataset.action === 'add-bus')      openAddBusModal();
     if (t.dataset.action === 'add-guest')    openAddGuestModal();
   });
+
+  // ===== Live search across active sub-tab =====
+  const gatesSearchEl = document.getElementById('gates-search');
+  const gatesSearchHint = document.getElementById('gates-search-hint');
+  function applyGatesFilter() {
+    const term = gatesSearchEl.value.trim().toLowerCase();
+    const activePane = document.querySelector('[data-sub-pane].is-active');
+    if (!activePane) return;
+    let visible = 0, total = 0;
+    // Filter table rows
+    activePane.querySelectorAll('tbody tr').forEach(row => {
+      total++;
+      if (!term) { row.style.display = ''; visible++; return; }
+      const txt = row.textContent.toLowerCase();
+      if (txt.includes(term)) { row.style.display = ''; visible++; }
+      else row.style.display = 'none';
+    });
+    // Filter pending-card style rows (exceptions sub-tab)
+    activePane.querySelectorAll('.pending-card, [data-card]').forEach(card => {
+      total++;
+      if (!term) { card.style.display = ''; visible++; return; }
+      const txt = card.textContent.toLowerCase();
+      if (txt.includes(term)) { card.style.display = ''; visible++; }
+      else card.style.display = 'none';
+    });
+    if (term) {
+      gatesSearchHint.hidden = false;
+      gatesSearchHint.textContent = `${visible} / ${total} תוצאות`;
+    } else {
+      gatesSearchHint.hidden = true;
+    }
+  }
+  gatesSearchEl.addEventListener('input', applyGatesFilter);
+  // Reapply when sub-tabs change
+  document.querySelectorAll('#gates-sub-tabs .sub-tab').forEach(t => t.addEventListener('click', () => setTimeout(applyGatesFilter, 0)));
 
   // ===== Form modal helper =====
   function openFormModal({ title, subtitle, fields, submitLabel, onSubmit }) {
@@ -1635,10 +1780,10 @@
       title: '+ הוסף אורח מאושר בתיאום',
       subtitle: 'רישום מהיר ללא יצירת משתמש. הש"ג יראה את האורח כ"מאושר בתיאום קב"ט".',
       fields: [
-        { name: 'name',        label: 'שם האורח',          required: true, placeholder: 'מאיר כהן' },
-        { name: 'phone',       label: 'מספר טלפון',         required: true, placeholder: '050-7654321' },
-        { name: 'plate',       label: 'מספר רכב',           required: true, placeholder: '99-887-66' },
-        { name: 'affiliation', label: 'סיבת הגעה / שיוך',   required: true, placeholder: 'הורה של חניך בתיאום' },
+        { name: 'name',        label: 'שם האורח',                    required: true, placeholder: 'מאיר כהן' },
+        { name: 'phone',       label: 'מספר טלפון',                   required: true, placeholder: '050-7654321' },
+        { name: 'plate',       label: 'מספר רכב (אופציונלי)',          required: false, placeholder: '99-887-66 — לא חובה' },
+        { name: 'affiliation', label: 'סיבת הגעה / שיוך',             required: true, placeholder: 'הורה של חניך בתיאום' },
       ],
       submitLabel: 'אשר אורח',
       onSubmit: (data) => {
@@ -1724,7 +1869,7 @@
             : (d.active
               ? `<button class="btn btn--sm btn--danger" data-block-user="${d.id}">חסום</button>`
               : `<button class="btn btn--sm btn--ok" data-unblock-user="${d.id}">החזר</button>`)}
-          ${d.emergency ? '<span class="chip chip--warn">חירום</span>' : '<span></span>'}
+          <button class="btn btn--sm btn--ghost" data-delete-user="${d.id}" title="מחק משתמש לצמיתות" style="color: var(--danger);">🗑 מחק</button>
         </div>
       `;
     }).join('');
@@ -1789,6 +1934,19 @@
       Toast.show('ההזמנה בוטלה. ניתן להנפיק חדשה.', { kind: 'warn' });
       renderDevices(); renderGates(); renderKpis();
     }
+    if (e.target.dataset.deleteUser) {
+      const id = e.target.dataset.deleteUser;
+      const target = (ScoutDB.get('staff', []) || []).find(s => s.id === id);
+      if (!target) return;
+      const ok1 = confirm(`למחוק את המשתמש "${target.name}" לצמיתות?\n\nפעולה זו תסיר אותו מ-localStorage, מבסיס הנתונים, ומכלל הטבלאות במחנה.`);
+      if (!ok1) return;
+      const ok2 = confirm('אישור הגנה אחרון:\n\nהמחיקה בלתי הפיכה. הפעולה תירשם בלוג המשפטי.\n\nלהמשיך?');
+      if (!ok2) return;
+      const r = Auth.deleteUser(id);
+      if (!r.ok) { Toast.show(r.error || 'מחיקה נכשלה', { kind: 'danger' }); return; }
+      Toast.show('המשתמש נמחק. הפעולה תועדה.', { kind: 'warn' });
+      renderDevices(); renderGates(); renderKpis(); renderPerms(); renderContacts();
+    }
   });
 
   document.getElementById('btn-add-user').addEventListener('click', () => {
@@ -1805,11 +1963,12 @@
 
   function openIssueUserModal() {
     // Step 1: pick role
+    // Unified security role — single "מאבטח" (mission chosen at login)
     const roleOptions = [
-      'guard','patrol','achmash','kabat',
-      'first-aid','medic','doctor','clinic-chief',
+      'guard','achmash','kabat',
+      'first-aid','medic','paramedic','doctor','clinic-chief',
       'hq-op','hq-shift','tribe',
-      'sanitation','safety','camp-director',
+      'sanitation','safety','provisions','camp-director',
     ].map(r => ({ value: r, label: UI.ROLE_LABELS[r] || r }));
 
     const host = document.createElement('div');
@@ -1931,11 +2090,80 @@
   document.getElementById('btn-ack-sos').addEventListener('click', () => {
     const cur = SOS.current();
     if (!cur || cur.acked) { Toast.show('אין אירוע SOS פעיל'); return; }
-    SOS.ack(); Toast.show('האירוע אושר.', { kind: 'ok' }); renderKpis(); renderOverridesStats();
+    SOS.ack(); Toast.show('האירוע אושר.', { kind: 'ok' }); renderKpis(); renderOverridesStats(); renderSosPanel();
   });
   document.getElementById('btn-clear-sos').addEventListener('click', () => {
-    SOS.clear(); Toast.show('האירוע נסגר.', { kind: 'ok' }); renderKpis(); renderOverridesStats();
+    const cur = SOS.current();
+    if (!cur) { Toast.show('אין אירוע SOS לסגירה'); return; }
+    // Mandatory debrief flow — delegated to engine's openDebriefModal via UI
+    UI.showSOSLockdown(cur); // shows HUD which has the close button → triggers debrief
+    Toast.show('פתח את ה-HUD הצף של האירוע ולחץ "סגור אירוע" — נדרש תחקיר.', { kind: 'warn' });
   });
+
+  function renderSosPanel() {
+    const ev = SOS.current();
+    const host = document.getElementById('sos-mgmt-panel');
+    if (!ev) {
+      host.innerHTML = '<div style="padding: 12px; background: var(--bg-elev); border-radius: var(--r-sm); text-align: center; color: var(--text-low);">אין אירוע SOS פעיל. הפאנל יוצג ברגע שאירוע יופעל.</div>';
+      return;
+    }
+    const urgency = ev.urgency || 'routine';
+    const forces = ev.externalForces || {};
+    host.innerHTML = `
+      <div style="background: var(--bg-elev); border: 1px solid var(--danger); border-radius: var(--r-sm); padding: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="color: var(--danger); font-weight: 800;">⚠ ${util.escapeHtml(ev.label)}</span>
+          <span style="flex:1"></span>
+          <span style="font-family: var(--font-mono); color: var(--text-mid); font-size: 11px;">${util.fmtTime(ev.ts)}</span>
+        </div>
+
+        <div style="font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 6px;">רמת דחיפות</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+          <button class="btn btn--sm ${urgency === 'routine' ? 'btn--primary' : ''}" data-urgency="routine">🟡 חריג שגרתי</button>
+          <button class="btn btn--sm ${urgency === 'complex' ? 'btn--primary' : ''}" style="${urgency === 'complex' ? 'background: var(--warn); color: #1a0e00; border-color: var(--warn);' : ''}" data-urgency="complex">🟠 אירוע מורכב</button>
+          <button class="btn btn--sm ${urgency === 'critical' ? 'btn--primary' : ''}" style="${urgency === 'critical' ? 'background: var(--danger); color: #fff; border-color: var(--danger);' : ''}" data-urgency="critical">🔴 סכנת חיים</button>
+        </div>
+
+        <div style="font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 6px;">מעורבות כוחות חיצוניים</div>
+        <div style="display: grid; gap: 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: ${forces.police ? 'rgba(91,141,239,0.16)' : 'var(--bg-deep)'}; border: 1px solid ${forces.police ? 'var(--info)' : 'var(--border)'}; border-radius: var(--r-sm); cursor: pointer;">
+            <input type="checkbox" data-force="police" ${forces.police ? 'checked' : ''} style="accent-color: var(--info);">
+            <span>🚓 משטרה ${forces.police ? '— הגיעה ליער' : ''}</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: ${forces.mda ? 'rgba(45,216,129,0.12)' : 'var(--bg-deep)'}; border: 1px solid ${forces.mda ? 'var(--ok)' : 'var(--border)'}; border-radius: var(--r-sm); cursor: pointer;">
+            <input type="checkbox" data-force="mda" ${forces.mda ? 'checked' : ''} style="accent-color: var(--ok);">
+            <span>🚑 מד״א (נט״ן) ${forces.mda ? '— הגיע ליער' : ''}</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: ${forces.fire ? 'rgba(255,71,87,0.12)' : 'var(--bg-deep)'}; border: 1px solid ${forces.fire ? 'var(--danger)' : 'var(--border)'}; border-radius: var(--r-sm); cursor: pointer;">
+            <input type="checkbox" data-force="fire" ${forces.fire ? 'checked' : ''} style="accent-color: var(--danger);">
+            <span>🚒 כיבוי אש ${forces.fire ? '— הגיע ליער' : ''}</span>
+          </label>
+        </div>
+
+        ${(ev.fieldUpdates && ev.fieldUpdates.length) ? `
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border);">
+            <div style="font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 6px;">עדכוני שטח (${ev.fieldUpdates.length})</div>
+            ${ev.fieldUpdates.slice(-3).reverse().map(u => `<div style="font-size: 12px; padding: 4px 0; color: var(--text-mid);"><span style="color: var(--accent); font-family: var(--font-mono);">${util.fmtTime(u.ts)}</span> · ${util.escapeHtml(u.text)}</div>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+    // Wire urgency buttons
+    host.querySelectorAll('[data-urgency]').forEach(b => {
+      b.addEventListener('click', () => {
+        SOS.setUrgency(b.dataset.urgency);
+        renderSosPanel();
+        Toast.show('רמת דחיפות עודכנה.', { kind: 'warn' });
+      });
+    });
+    // Wire force checkboxes
+    host.querySelectorAll('[data-force]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        SOS.setExternalForce(cb.dataset.force, cb.checked);
+        renderSosPanel();
+      });
+    });
+  }
   document.getElementById('btn-emergency-broadcast').addEventListener('click', () => {
     Chat.broadcast('⚠ קב"ט: דרישת ערנות מיידית — בדוק עמדה');
     Scout.Audio.play('voice-prompt', { text: 'דרישת ערנות מיידית מהקב"ט' });
@@ -2384,9 +2612,10 @@
   Bus.on('audit:append', () => { renderAudit(); renderKpis(); renderOverridesStats(); });
   Bus.on('bus:gate-exception', () => { renderGates(); renderKpis(); });
   Bus.on('bus:gate-exception:resolved', () => { renderGates(); renderKpis(); });
-  Bus.on('sos:trigger', () => { renderKpis(); renderOverridesStats(); });
-  Bus.on('sos:ack', () => { renderKpis(); renderOverridesStats(); });
-  Bus.on('sos:clear', () => { renderKpis(); renderOverridesStats(); });
+  Bus.on('sos:trigger', () => { renderKpis(); renderOverridesStats(); renderSosPanel(); });
+  Bus.on('sos:ack', () => { renderKpis(); renderOverridesStats(); renderSosPanel(); });
+  Bus.on('sos:clear', () => { renderKpis(); renderOverridesStats(); renderSosPanel(); });
+  Bus.on('sos:updated', () => { renderKpis(); renderSosPanel(); });
   Bus.on('sos:escalated', ev => {
     Scout.Audio.play('tactical-siren');
     UI.showSOSLockdown(Object.assign({}, ev, { label: '🚨 הוסלם לקב״ט: ' + ev.label }));
@@ -2419,6 +2648,7 @@
   renderChannels();
   renderMessages();
   renderDms();
+  renderSosPanel();
   updateChatBadge();
 })();
 </script>
