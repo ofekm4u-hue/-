@@ -8,7 +8,7 @@
   // ---------- Constants ----------
 
   const NS = 'scout:';
-  const SCHEMA_VERSION = 5;
+  const SCHEMA_VERSION = 6;
 
   const FORESTS = [
     { id: 'ben-shemen',   name: 'יער בן שמן',     lat: 31.957, lng: 34.951, region: 'מרכז',  hanichim: 412, staff: 78, status: 'ok' },
@@ -753,11 +753,12 @@
 
     function currentPersona() {
       const stored = ScoutDB.get('currentPersona', null);
-      const def = { name: 'אורח דמו', role: 'national', roleLabel: ROLE_LABELS['national'], staffId: null, forestId: null };
+      const def = { name: 'אורח דמו', role: 'national', roleLabel: ROLE_LABELS['national'], staffId: null, forestId: null, leadershipId: null };
       const p = stored || def;
       p.roleLabel = ROLE_LABELS[p.role] || p.role;
       if (p.staffId === undefined) p.staffId = null;
       if (p.forestId === undefined) p.forestId = null;
+      if (p.leadershipId === undefined) p.leadershipId = null;
       return p;
     }
     function setPersona(p) {
@@ -768,6 +769,7 @@
         roleLabel: ROLE_LABELS[role],
         staffId: p.staffId || null,
         forestId: p.forestId || null,
+        leadershipId: p.leadershipId || null,
       });
     }
 
@@ -1079,7 +1081,7 @@
 
   const Auth = (function () {
     // Default seed credentials — copied to DB on first run so they can be edited live
-    const CREDS_VERSION = 2; // bump to force reseed when CREDS_VERSION changes
+    const CREDS_VERSION = 3; // bump to force reseed when CREDS_VERSION changes
     const DEFAULT_CREDENTIALS = {
       'national': { role: 'national',     name: 'אורי שדה — מנהל ארצי',  password: '1234', isDemo: true, status: 'active' },
       'kabat':    { role: 'kabat',        name: 'קב״ט ניר אלון',          password: '1234', isDemo: true, status: 'active', staffId: 's1' },
@@ -1103,7 +1105,7 @@
       'first-aid':    'clinic.html',
       'doctor':       'clinic.html',
       'hq-shift':     'hq-operator.html',
-      'sanitation':   'home.html',
+      'sanitation':   'sanitation.html',
       'safety':       'home.html',
       'camp-director':'home.html',
       'provisions':   'economy.html',
@@ -1150,8 +1152,9 @@
       if (!found) return { ok: false, error: 'שם משתמש לא קיים במערכת' };
       const { user, cred } = found;
       if (cred.password !== password) return { ok: false, error: 'סיסמה שגויה' };
-      UI.setPersona({ name: cred.name, role: cred.role, staffId: cred.staffId, username: user, forestId: cred.forestId || null });
+      UI.setPersona({ name: cred.name, role: cred.role, staffId: cred.staffId, username: user, forestId: cred.forestId || null, leadershipId: cred.leadershipId || null });
       if (cred.forestId) ScoutDB.set('currentForest', cred.forestId);
+      if (cred.leadershipId) ScoutDB.set('currentLeadership', cred.leadershipId);
       ScoutDB.set('loggedIn', true);
       ScoutDB.set('loginTs', nowMs());
       ScoutDB.set('loginUser', user);
@@ -1232,6 +1235,7 @@
       const tempPassword = generateTempPassword();
       const staffId = 'st-' + uuid().slice(0, 6);
       const forestId = opts.forestId || null;
+      const leadershipId = opts.leadershipId || null;
 
       ScoutDB.patch('staff', l => (l || []).concat([{
         id: staffId,
@@ -1241,6 +1245,7 @@
         pendingOnboarding: true,
         tempUsername,
         forestId,
+        leadershipId,
         createdByKabat: true,
         createdAt: nowMs(),
       }]));
@@ -1248,19 +1253,21 @@
 
       creds[tempUsername] = {
         role, name: tempUsername, password: tempPassword,
-        staffId, status: 'pending', createdAt: nowMs(), forestId,
+        staffId, status: 'pending', createdAt: nowMs(), forestId, leadershipId,
       };
       setCreds(creds);
 
       const roleLabel = UI.ROLE_LABELS[role] || role;
-      const forestSuffix = forestId ? ` (יער ${(Forests.get(forestId) || {}).name || forestId})` : '';
+      const forest = forestId ? (Forests.get(forestId) || {}) : null;
+      const lead = (forestId && leadershipId) ? (Forests.leadership(forestId, leadershipId) || null) : null;
+      const forestSuffix = forest ? ` (יער ${forest.name || forestId}${lead ? ` / ${lead.name}` : ''})` : '';
       ScoutDB.appendAudit({
         action: 'USER-INVITE', channel: 'auth',
         details: `הונפק משתמש זמני "${tempUsername}" בתפקיד ${roleLabel}${forestSuffix} — ממתין להפעלה`,
       });
-      Bus.emit('auth:user-invited', { tempUsername, role, staffId, forestId });
+      Bus.emit('auth:user-invited', { tempUsername, role, staffId, forestId, leadershipId });
       Bus.emit('personnel:update', { staffId, invited: true });
-      return { tempUsername, tempPassword, role, staffId, forestId };
+      return { tempUsername, tempPassword, role, staffId, forestId, leadershipId };
     }
 
     function completeOnboarding(profile) {
@@ -1304,12 +1311,14 @@
         phone,
         onboardedAt: nowMs(),
         forestId: cred.forestId || null,
+        leadershipId: cred.leadershipId || null,
       };
       setCreds(creds);
 
-      UI.setPersona({ name: credKey, role: cred.role, staffId: cred.staffId, username: credKey, forestId: cred.forestId || null });
+      UI.setPersona({ name: credKey, role: cred.role, staffId: cred.staffId, username: credKey, forestId: cred.forestId || null, leadershipId: cred.leadershipId || null });
       ScoutDB.set('loginUser', credKey);
       if (cred.forestId) ScoutDB.set('currentForest', cred.forestId);
+      if (cred.leadershipId) ScoutDB.set('currentLeadership', cred.leadershipId);
 
       const roleLabel = UI.ROLE_LABELS[cred.role] || cred.role;
       ScoutDB.appendAudit({
@@ -1995,19 +2004,29 @@
     function get(id) {
       return list().find(f => f.id === id) || null;
     }
-    function create({ name, region, lat, lng, provisionCore }) {
+    function create({ name, region, lat, lng, leaderships, provisionCore }) {
       if (!name || !String(name).trim()) return { ok: false, error: 'שם יער נדרש' };
       const all = list();
       if (all.find(f => f.name === name)) return { ok: false, error: 'יער בשם זה כבר קיים' };
-      // Short numeric tag used for the auto-generated core usernames
       const tag = String(100 + Math.floor(Math.random() * 900));
       const id = 'f-' + tag + '-' + uuid().slice(0, 4);
+      // Normalize leaderships (rounds) — each gets an id + date range
+      const leaderArr = (leaderships && leaderships.length ? leaderships : [{ name: 'הנהגה א' }])
+        .filter(l => l && String(l.name || '').trim())
+        .map((l, i) => ({
+          id: 'L-' + tag + '-' + (i + 1),
+          name: String(l.name).trim(),
+          start: l.start || null,
+          end: l.end || null,
+          status: 'active',
+        }));
       const forest = {
         id, tag, name: String(name).trim(),
         region: region || 'אזור חדש',
         lat: lat || (31 + Math.random() * 2.5),
         lng: lng || (34.5 + Math.random() * 2),
         hanichim: 0, staff: 0, status: 'ok',
+        leaderships: leaderArr,
         custom: true,
         createdBy: UI.currentPersona().name,
         createdByRole: UI.currentPersona().role,
@@ -2016,28 +2035,64 @@
       ScoutDB.patch('customForests', l => (l || []).concat([forest]));
       ScoutDB.appendAudit({
         action: 'FOREST-CREATE', channel: 'auth',
-        details: `הוקם יער "${forest.name}" (${forest.region}) ע"י ${forest.createdBy}`,
+        details: `הוקם יער "${forest.name}" (${forest.region}) עם ${leaderArr.length} הנהגות ע"י ${forest.createdBy}`,
       });
       Bus.emit('forests:updated', { kind: 'created', forest });
-
-      // Auto-provision the 3 core users tied ONLY to this forest
-      let coreUsers = [];
-      if (provisionCore !== false) {
-        coreUsers = [
-          Object.assign({ roleLabel: 'קב"ט היער' },
-            Auth.issueTempUser('kabat',         { forestId: id, usernamePrefix: 'kbat_' + tag })),
-          Object.assign({ roleLabel: 'מנהל מחנה' },
-            Auth.issueTempUser('camp-director', { forestId: id, usernamePrefix: 'mahane_' + tag })),
-          Object.assign({ roleLabel: 'אחראי חמ"ל' },
-            Auth.issueTempUser('hq-shift',      { forestId: id, usernamePrefix: 'hamal_' + tag })),
-        ];
-        ScoutDB.appendAudit({
-          action: 'FOREST-CORE-USERS', channel: 'auth',
-          details: `נוצרו אוטומטית 3 משתמשי ליבה ליער "${forest.name}": קב"ט, מנהל מחנה, אחראי חמ"ל`,
-        });
-      }
-      return { ok: true, forest, coreUsers };
+      return { ok: true, forest };
     }
+
+    function leaderships(forestId) {
+      const f = get(forestId);
+      return (f && f.leaderships) || [];
+    }
+    function leadership(forestId, leadershipId) {
+      return leaderships(forestId).find(l => l.id === leadershipId) || null;
+    }
+
+    // Provision the 3 core users for a specific forest + leadership combo
+    function provisionCoreUsers(forestId, leadershipId) {
+      const f = get(forestId);
+      if (!f) return { ok: false, error: 'יער לא נמצא' };
+      const lead = leadership(forestId, leadershipId);
+      const suffix = f.tag + (lead ? '_' + leadershipId.split('-').pop() : '');
+      const opt = role => ({ forestId, leadershipId: leadershipId || null });
+      const coreUsers = [
+        Object.assign({ roleLabel: 'קב"ט' },        Auth.issueTempUser('kabat',         Object.assign(opt(), { usernamePrefix: 'kbat_' + suffix }))),
+        Object.assign({ roleLabel: 'מנהל מחנה' },    Auth.issueTempUser('camp-director', Object.assign(opt(), { usernamePrefix: 'mahane_' + suffix }))),
+        Object.assign({ roleLabel: 'אחראי חמ"ל' },   Auth.issueTempUser('hq-shift',      Object.assign(opt(), { usernamePrefix: 'hamal_' + suffix }))),
+      ];
+      ScoutDB.appendAudit({
+        action: 'FOREST-CORE-USERS', channel: 'auth',
+        details: `נוצרו 3 משתמשי ליבה ליער "${f.name}" / ${lead ? lead.name : '—'}`,
+      });
+      return { ok: true, coreUsers };
+    }
+
+    // End-camp: lock a leadership round and produce a summary report
+    function endCamp(forestId, leadershipId) {
+      const f = get(forestId);
+      const lead = leadership(forestId, leadershipId);
+      if (!f || !lead) return { ok: false, error: 'לא נמצא' };
+      ScoutDB.patch('customForests', l => (l || []).map(x => x.id === forestId
+        ? Object.assign({}, x, {
+            leaderships: x.leaderships.map(L => L.id === leadershipId
+              ? Object.assign({}, L, { status: 'closed', closedAt: nowMs(), closedBy: UI.currentPersona().name })
+              : L),
+          })
+        : x));
+      ScoutDB.appendAudit({
+        action: 'CAMP-END', channel: 'auth',
+        details: `סיום מחנה: ${f.name} / ${lead.name} ננעל ע"י ${UI.currentPersona().name}`,
+      });
+      Bus.emit('forests:updated', { kind: 'camp-ended', forestId, leadershipId });
+      // Summary report aggregated from Debrief over the leadership window
+      const range = (lead.start && lead.end)
+        ? { from: new Date(lead.start).getTime(), to: new Date(lead.end).getTime() + 86_400_000 }
+        : { lastDays: 30 };
+      const report = Debrief.generate(range);
+      return { ok: true, report, forest: f, leadership: lead };
+    }
+
     function remove(id) {
       const cur = listCustom();
       const f = cur.find(x => x.id === id);
@@ -2047,7 +2102,7 @@
       Bus.emit('forests:updated', { kind: 'deleted', id });
       return { ok: true };
     }
-    return { list, listSeeded, listCustom, get, create, remove };
+    return { list, listSeeded, listCustom, get, create, remove, leaderships, leadership, provisionCoreUsers, endCamp };
   })();
 
   // ---------- System (national-only hard reset / blank slate) ----------
@@ -2152,7 +2207,7 @@
     return { canIssue, blockedRolesFor, explanation, SECURITY_ROLES, MEDICAL_ROLES };
   })();
 
-  // ---------- Tenancy (strict per-forest data isolation) ----------
+  // ---------- Tenancy (strict per-forest + per-leadership data isolation) ----------
 
   const Tenancy = (function () {
     // The forest the current user is locked to. National = null (sees all).
@@ -2161,24 +2216,49 @@
       if (p.role === 'national') return null;
       return p.forestId || ScoutDB.get('currentForest', null);
     }
-    // Filter an array of records to the current user's forest.
+    // The leadership round the current user is locked to. National = null.
+    function scopeLeadership() {
+      const p = UI.currentPersona();
+      if (p.role === 'national') return null;
+      return p.leadershipId || ScoutDB.get('currentLeadership', null);
+    }
+    // Filter an array of records to the current user's forest + leadership.
+    // - National: unrestricted
+    // - Forest user without leadership: forest-only filter (legacy fallback)
+    // - Forest+leadership user: STRICT — record must match BOTH (records without
+    //   leadershipId are treated as legacy/shared and pass forest match)
     function filter(records) {
       const fid = scope();
-      if (fid === null) return records;            // national: unrestricted
-      return (records || []).filter(r => !r.forestId || r.forestId === fid);
+      const lid = scopeLeadership();
+      if (fid === null) return records;                // national: unrestricted
+      return (records || []).filter(r => {
+        if (!r.forestId) return true;                   // unscoped record — visible
+        if (r.forestId !== fid) return false;
+        if (lid && r.leadershipId && r.leadershipId !== lid) return false;
+        return true;
+      });
     }
     // Guard: can the current user access a record? (national always yes)
     function canAccess(record) {
       const fid = scope();
+      const lid = scopeLeadership();
       if (fid === null) return true;
-      return !record || !record.forestId || record.forestId === fid;
+      if (!record || !record.forestId) return true;
+      if (record.forestId !== fid) return false;
+      if (lid && record.leadershipId && record.leadershipId !== lid) return false;
+      return true;
     }
     // The forestId to stamp on records the current user creates.
     function ownForest() {
       const p = UI.currentPersona();
       return p.forestId || ScoutDB.get('currentForest', null);
     }
-    return { scope, filter, canAccess, ownForest };
+    // The leadershipId to stamp on records the current user creates.
+    function ownLeadership() {
+      const p = UI.currentPersona();
+      return p.leadershipId || ScoutDB.get('currentLeadership', null);
+    }
+    return { scope, scopeLeadership, filter, canAccess, ownForest, ownLeadership };
   })();
 
   // ---------- Economy Manager (food/logistics/budget, forest-scoped) ----------
@@ -2192,7 +2272,7 @@
       const s = {
         id: 'sup-' + uuid().slice(0, 6),
         name, category: category || 'כללי', phone: phone || null,
-        status: 'active', forestId: Tenancy.ownForest(),
+        status: 'active', forestId: Tenancy.ownForest(), leadershipId: Tenancy.ownLeadership(),
         addedBy: UI.currentPersona().name, ts: nowMs(),
       };
       ScoutDB.patch('ecoSuppliers', l => (l || []).concat([s]));
@@ -2204,7 +2284,7 @@
       const s = {
         id: 'supreq-' + uuid().slice(0, 6),
         name, category: category || 'כללי', phone: phone || null,
-        status: 'pending_approval', forestId: Tenancy.ownForest(),
+        status: 'pending_approval', forestId: Tenancy.ownForest(), leadershipId: Tenancy.ownLeadership(),
         requestedBy: UI.currentPersona().name, requestedByRole: UI.currentPersona().role,
         ts: nowMs(),
       };
@@ -2231,7 +2311,8 @@
         supplier, amount: parseFloat(amount) || 0,
         date: date || new Date().toISOString().slice(0, 10),
         desc: desc || '', receiptImg: receiptImg || null,
-        forestId: Tenancy.ownForest(), by: UI.currentPersona().name, ts: nowMs(),
+        forestId: Tenancy.ownForest(), leadershipId: Tenancy.ownLeadership(),
+        by: UI.currentPersona().name, ts: nowMs(),
       };
       ScoutDB.patch('ecoExpenses', l => (l || []).concat([e]));
       ScoutDB.appendAudit({ action: 'ECO-EXPENSE', channel: 'comms', details: `${supplier}: ₪${e.amount}` });
@@ -2243,10 +2324,11 @@
     function menus() { return scoped('ecoMenus'); }
     function setMenu({ day, tribe, meal, dish, notes }) {
       const fid = Tenancy.ownForest();
-      const key = `${fid}|${day}|${tribe}|${meal}`;
+      const lid = Tenancy.ownLeadership();
+      const key = `${fid}|${lid || 'nolead'}|${day}|${tribe}|${meal}`;
       const all = ScoutDB.get('ecoMenus', []) || [];
       const idx = all.findIndex(m => m.key === key);
-      const rec = { id: idx >= 0 ? all[idx].id : 'menu-' + uuid().slice(0, 6), key, day, tribe, meal, dish, notes: notes || '', forestId: fid, ts: nowMs() };
+      const rec = { id: idx >= 0 ? all[idx].id : 'menu-' + uuid().slice(0, 6), key, day, tribe, meal, dish, notes: notes || '', forestId: fid, leadershipId: lid, ts: nowMs() };
       if (idx >= 0) all[idx] = rec; else all.push(rec);  // overwrite if same slot
       ScoutDB.set('ecoMenus', all);
       Bus.emit('economy:menus', rec);
@@ -2266,6 +2348,7 @@
       const d = {
         id: 'del-' + uuid().slice(0, 8),
         forestId: Tenancy.ownForest(),
+        leadershipId: Tenancy.ownLeadership(),
         tribe, meal, receiver, items: items || '',
         sigReceiver: sigReceiver || null, sigEconomy: sigEconomy || null,
         economyName: UI.currentPersona().name, ts: nowMs(),
@@ -2283,6 +2366,175 @@
       menus, setMenu, importMenuRows,
       deliveries, recordDelivery,
     };
+  })();
+
+  // ---------- Sanitation Inspector (forest+leadership scoped) ----------
+
+  const Sanitation = (function () {
+    function scoped(key) { return Tenancy.filter(ScoutDB.get(key, []) || []); }
+
+    // ===== Module A: Tasks (garbage, toilets, cleanliness, pest control) =====
+    const TASK_CATEGORIES = [
+      { id: 'garbage', label: 'פינוי אשפה' },
+      { id: 'toilets', label: 'פינוי שירותים/שאיבת כימי' },
+      { id: 'cleanliness', label: 'ניקיון היער' },
+      { id: 'pest', label: 'הדברה' },
+    ];
+    function tasks() { return scoped('sanTasks'); }
+    function addTask({ category, title, location, priority, notes }) {
+      const t = {
+        id: 'st-' + uuid().slice(0, 6),
+        forestId: Tenancy.ownForest(),
+        leadershipId: Tenancy.ownLeadership(),
+        category: category || 'cleanliness',
+        title: String(title || '').trim(),
+        location: location || '',
+        priority: priority || 'normal',
+        notes: notes || '',
+        status: 'open',
+        createdBy: UI.currentPersona().name,
+        ts: nowMs(),
+      };
+      ScoutDB.patch('sanTasks', l => (l || []).concat([t]));
+      ScoutDB.appendAudit({ action: 'SAN-TASK-ADD', channel: 'comms', details: `משימת תברואה: ${t.title} (${t.category})` });
+      Bus.emit('sanitation:task', t);
+      return t;
+    }
+    function setTaskStatus(id, status) {
+      ScoutDB.patch('sanTasks', l => (l || []).map(t => t.id === id
+        ? Object.assign({}, t, { status, resolvedAt: status === 'done' ? nowMs() : null, resolvedBy: status === 'done' ? UI.currentPersona().name : null })
+        : t));
+      ScoutDB.appendAudit({ action: 'SAN-TASK-STATUS', channel: 'comms', details: `${id} → ${status}` });
+      Bus.emit('sanitation:task', { id, status });
+    }
+
+    // ===== Module B: Kitchen inspections =====
+    const KITCHEN_CHECKLIST = [
+      { id: 'fridgeTemp',  label: 'טמפרטורת מקררים תקינה (≤ 4°C)' },
+      { id: 'separation',  label: 'הפרדת מזון בשרי/חלבי/נא/מבושל' },
+      { id: 'hygiene',     label: 'היגיינת עובדים (כפפות, כובעי שיער)' },
+      { id: 'cleanliness', label: 'ניקיון משטחי עבודה ומדפים' },
+      { id: 'water',       label: 'אספקת מים תקינה' },
+      { id: 'electric',    label: 'חשמל תקין (ללא חיווט חשוף)' },
+      { id: 'pestFree',    label: 'אין סימני מזיקים' },
+      { id: 'storage',     label: 'אחסון בגובה הנכון מהרצפה' },
+    ];
+    function inspections() { return scoped('sanInspections'); }
+    function fileInspection({ tribe, kitchenName, checklist, notes, sigRep, repName }) {
+      const total = (checklist || []).length || KITCHEN_CHECKLIST.length;
+      const passed = (checklist || []).filter(x => x.pass).length;
+      const score = total ? Math.round((passed / total) * 100) : 0;
+      const r = {
+        id: 'insp-' + uuid().slice(0, 8),
+        forestId: Tenancy.ownForest(),
+        leadershipId: Tenancy.ownLeadership(),
+        tribe: tribe || '—',
+        kitchenName: kitchenName || ('מטבח ' + (tribe || '')),
+        inspector: UI.currentPersona().name,
+        checklist: checklist || [],
+        score, passed, total,
+        notes: notes || '',
+        sigRep: sigRep || null,
+        repName: repName || '',
+        ts: nowMs(),
+      };
+      ScoutDB.patch('sanInspections', l => (l || []).concat([r]));
+      ScoutDB.appendAudit({ action: 'SAN-INSPECTION', channel: 'comms', details: `ביקורת ${r.kitchenName} (${r.score}%) ע"י ${r.inspector}` });
+      Bus.emit('sanitation:inspection', r);
+      return r;
+    }
+
+    // ===== Module C: Urgent sanitation alerts → HQ =====
+    function alerts() { return scoped('sanAlerts'); }
+    function raiseAlert({ title, severity, location, details }) {
+      const a = {
+        id: 'sal-' + uuid().slice(0, 8),
+        forestId: Tenancy.ownForest(),
+        leadershipId: Tenancy.ownLeadership(),
+        title: String(title || 'התראת תברואה').trim(),
+        severity: severity || 'urgent',
+        location: location || '',
+        details: details || '',
+        raisedBy: UI.currentPersona().name,
+        status: 'open',
+        ts: nowMs(),
+      };
+      ScoutDB.patch('sanAlerts', l => (l || []).concat([a]));
+      ScoutDB.appendAudit({ action: 'SAN-ALERT', channel: 'comms', details: `התראת תברואה דחופה: ${a.title}` });
+      // Push to HQ via Incidents module if available — falls back to bus event
+      try {
+        if (global.Scout && Scout.Incidents && Scout.Incidents.create) {
+          Scout.Incidents.create({
+            title: '[תברואה] ' + a.title,
+            type: 'sanitation',
+            priority: severity === 'critical' ? 'high' : 'medium',
+            location: a.location,
+            details: a.details,
+          });
+        }
+      } catch (e) { /* incidents may not exist in test env */ }
+      Bus.emit('sanitation:alert', a);
+      Bus.emit('bus:hq:alert', { source: 'sanitation', payload: a });
+      return a;
+    }
+    function resolveAlert(id) {
+      ScoutDB.patch('sanAlerts', l => (l || []).map(a => a.id === id
+        ? Object.assign({}, a, { status: 'resolved', resolvedAt: nowMs(), resolvedBy: UI.currentPersona().name })
+        : a));
+      Bus.emit('sanitation:alert', { id, resolved: true });
+    }
+
+    return {
+      TASK_CATEGORIES, KITCHEN_CHECKLIST,
+      tasks, addTask, setTaskStatus,
+      inspections, fileInspection,
+      alerts, raiseAlert, resolveAlert,
+    };
+  })();
+
+  // ---------- Real-time Camp Map (sync per forest+leadership) ----------
+
+  const CampMap = (function () {
+    // Storage shape per (forestId, leadershipId): { tribes: [{id,name,x,y,color}], updatedAt, updatedBy }
+    function key(fid, lid) { return 'campMap:' + (fid || 'noforest') + ':' + (lid || 'nolead'); }
+    function load(fid, lid) {
+      fid = fid || Tenancy.ownForest();
+      lid = lid || Tenancy.ownLeadership();
+      const m = ScoutDB.get(key(fid, lid), null);
+      return m || { tribes: [], updatedAt: 0, updatedBy: null, forestId: fid, leadershipId: lid };
+    }
+    function canEdit() {
+      const p = UI.currentPersona();
+      // Only the camp director of the matching forest+leadership can edit
+      return p.role === 'camp-director' || p.role === 'national';
+    }
+    function save(map) {
+      const fid = map.forestId || Tenancy.ownForest();
+      const lid = map.leadershipId || Tenancy.ownLeadership();
+      if (!canEdit()) return { ok: false, error: 'אין הרשאת עריכה (רק מנהל מחנה)' };
+      const next = Object.assign({}, map, {
+        forestId: fid, leadershipId: lid,
+        updatedAt: nowMs(), updatedBy: UI.currentPersona().name,
+      });
+      ScoutDB.set(key(fid, lid), next);
+      ScoutDB.appendAudit({ action: 'CAMPMAP-SAVE', channel: 'comms', details: `מפת מחנה עודכנה (${(next.tribes || []).length} שבטים)` });
+      Bus.emit('campmap:updated', { forestId: fid, leadershipId: lid, by: next.updatedBy });
+      return { ok: true, map: next };
+    }
+    function placeTribe(tribeId, name, x, y, color) {
+      const m = load();
+      const arr = (m.tribes || []).slice();
+      const idx = arr.findIndex(t => t.id === tribeId);
+      const entry = { id: tribeId, name, x, y, color: color || '#4DD0E1' };
+      if (idx >= 0) arr[idx] = entry;
+      else arr.push(entry);
+      return save(Object.assign({}, m, { tribes: arr }));
+    }
+    function removeTribe(tribeId) {
+      const m = load();
+      return save(Object.assign({}, m, { tribes: (m.tribes || []).filter(t => t.id !== tribeId) }));
+    }
+    return { load, save, placeTribe, removeTribe, canEdit };
   })();
 
   // ---------- Debrief / Analytics aggregator ----------
@@ -2470,7 +2722,7 @@
   global.Scout = {
     ScoutDB, Bus, Audio, DMS, SOS, Geo, Toast, Modal, UI, Auth, Drone, Chat, Personnel,
     Gate, Checkout, ParentPickup, Incidents, HQPermissions, Roster, Debrief,
-    Forests, RoleProvisioning, System, Tenancy, Economy,
+    Forests, RoleProvisioning, System, Tenancy, Economy, Sanitation, CampMap,
     util: { uuid, nowMs, fmtTime, fmtDate, pick, clamp, escapeHtml, getParam },
     FORESTS,
   };

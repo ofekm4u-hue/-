@@ -445,15 +445,14 @@
 
   function enterForest(forest) {
     ScoutDB.set('currentForest', forest.id);
-    // For National manager, navigate directly to the forest dashboard
-    // (the spec: clicking a forest opens the FULL forest management, not a persona picker)
+    // National manager: open leadership category menu (per spec — pick a round first)
     if (UI.currentPersona().role === 'national') {
       ScoutDB.appendAudit({
-        action: 'NATIONAL-FOREST-ENTER', channel: 'auth',
-        details: `מנהל ארצי נכנס לדשבורד יער ${forest.name}`,
+        action: 'NATIONAL-FOREST-OPEN', channel: 'auth',
+        details: `מנהל ארצי פתח תפריט הנהגות ליער ${forest.name}`,
         actor: UI.currentPersona().name + ' / מנהל ארצי',
       });
-      location.href = 'hq-operator.html?forest=' + forest.id;
+      openForestLeadershipMenu(forest);
     } else {
       // Other roles still get the persona switcher (legacy multi-role demo)
       openPersonaModal(forest);
@@ -605,18 +604,35 @@
   function openCreateForestModal() {
     const host = document.createElement('div');
     host.className = 'modal-host';
+    const leadershipRow = (i, defaultName) => `
+      <div class="leadership-row" data-row="${i}" style="display:grid; grid-template-columns: 1fr 130px 130px auto; gap:6px; align-items:end; margin-bottom:8px;">
+        <div>
+          ${i === 0 ? '<label style="display:block; font-family: var(--font-ui); font-size: 10px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px;">שם ההנהגה (סבב)</label>' : ''}
+          <input class="input" name="leadName" placeholder='לדוגמה: "הנהגת הבקעה"' value="${defaultName || ''}">
+        </div>
+        <div>
+          ${i === 0 ? '<label style="display:block; font-family: var(--font-ui); font-size: 10px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px;">תחילה</label>' : ''}
+          <input class="input" type="date" name="leadStart">
+        </div>
+        <div>
+          ${i === 0 ? '<label style="display:block; font-family: var(--font-ui); font-size: 10px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px;">סיום</label>' : ''}
+          <input class="input" type="date" name="leadEnd">
+        </div>
+        <button type="button" class="btn btn--sm btn--ghost" data-remove-row title="מחק">✕</button>
+      </div>
+    `;
     host.innerHTML = `
-      <form class="modal" style="width: min(540px, 92vw);">
-        <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">+ הקמת יער חדש</div>
-        <h3 style="margin: 6px 0 4px;">צור ישות יער עצמאית</h3>
-        <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">המערכת תייצר localStorage namespace מבודד עבור היער הזה. הנתונים שלו לא יזלגו לשום יער אחר.</p>
+      <form class="modal" style="width: min(620px, 94vw); max-height: 94vh; overflow-y: auto;">
+        <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">+ הקמת יער חדש (שכבה דו-שכבתית)</div>
+        <h3 style="margin: 6px 0 4px;">צור יער + הנהגות (סבבים)</h3>
+        <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">היער הוא תא השטח הפיזי. ההנהגות (סבבים) הן הקבוצות שנמצאות בשטח בתאריכים ספציפיים. כל משתמש נעול לשילוב יער + הנהגה.</p>
 
         <div style="margin-bottom: 12px;">
           <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">שם היער *</label>
           <input class="input" name="name" required placeholder='לדוגמה: "יער סוללים", "יער ציפורי"'>
         </div>
 
-        <div style="margin-bottom: 12px;">
+        <div style="margin-bottom: 14px;">
           <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">אזור גיאוגרפי</label>
           <select class="select" name="region">
             <option value="צפון">צפון</option>
@@ -629,8 +645,21 @@
           </select>
         </div>
 
+        <div style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; margin-bottom: 14px; background: var(--bg-elev);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+            <strong style="font-family: var(--font-ui); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-hi);">הנהגות (סבבים)</strong>
+            <button type="button" class="btn btn--sm" id="add-leadership-row">+ הוסף הנהגה</button>
+          </div>
+          <div id="leaderships-container">
+            ${leadershipRow(0, 'הנהגה א')}
+            ${leadershipRow(1, 'הנהגה ב')}
+            ${leadershipRow(2, 'הנהגה ג')}
+          </div>
+          <div style="font-size: 11px; color: var(--text-mid); margin-top: 4px;">⓵ ברירת מחדל: 3 הנהגות. ניתן להוסיף עוד בעזרת הכפתור.</div>
+        </div>
+
         <div style="background: rgba(91,141,239,0.08); border: 1px solid rgba(91,141,239,0.3); border-radius: var(--r-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-mid);">
-          🔒 לאחר ההקמה תוצע אפשרות להנפיק מיידית את משתמשי הליבה של היער (קב"ט, מערכת חמ"ל, מנהל מחנה).
+          🔒 לאחר ההקמה: לחיצה על היער תפתח תפריט הנהגות. לכל הנהגה תוכל להפיק את משתמשי הליבה (קב"ט + מנהל מחנה + אחראי חמ"ל) המשויכים ספציפית ליער + הנהגה.
         </div>
 
         <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -641,28 +670,218 @@
     `;
     document.body.appendChild(host);
     const form = host.querySelector('form');
+    const container = host.querySelector('#leaderships-container');
+    let rowCount = 3;
+    host.querySelector('#add-leadership-row').addEventListener('click', () => {
+      const div = document.createElement('div');
+      div.innerHTML = leadershipRow(rowCount++, '');
+      container.appendChild(div.firstElementChild);
+    });
+    container.addEventListener('click', e => {
+      if (e.target.closest('[data-remove-row]')) {
+        const row = e.target.closest('.leadership-row');
+        if (container.querySelectorAll('.leadership-row').length > 1) row.remove();
+        else Toast.show('חייבת להישאר לפחות הנהגה אחת', { kind: 'warn' });
+      }
+    });
     host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
     host.addEventListener('click', e => { if (e.target === host) host.remove(); });
     form.addEventListener('submit', e => {
       e.preventDefault();
+      const rows = Array.from(container.querySelectorAll('.leadership-row'));
+      const leaderships = rows.map(row => ({
+        name:  row.querySelector('[name="leadName"]').value.trim(),
+        start: row.querySelector('[name="leadStart"]').value || null,
+        end:   row.querySelector('[name="leadEnd"]').value || null,
+      })).filter(l => l.name);
+      if (!leaderships.length) { Toast.show('יש להגדיר לפחות הנהגה אחת', { kind: 'warn' }); return; }
       const r = Scout.Forests.create({
         name: form.name.value.trim(),
         region: form.region.value,
+        leaderships,
       });
       if (!r.ok) { Toast.show(r.error, { kind: 'warn' }); return; }
       host.remove();
       Scout.Audio.play('echo-bell');
       renderForests();
-      // Show the auto-generated core-user credentials (sticky modal)
-      showForestCredentialsModal(r.forest, r.coreUsers);
+      Toast.show(`✓ יער "${r.forest.name}" הוקם עם ${r.forest.leaderships.length} הנהגות. לחץ עליו להפקת משתמשי ליבה.`, { kind: 'ok', duration: 6000 });
+      // Auto-open the forest leadership menu so the manager can provision immediately
+      setTimeout(() => openForestLeadershipMenu(r.forest), 200);
     });
     form.name.focus();
   }
 
-  // "פרטי התחברות ליער החדש" — sticky modal, only closes via the Close button
-  function showForestCredentialsModal(forest, coreUsers) {
+  // National-only: forest leadership category menu
+  function openForestLeadershipMenu(forest) {
     const host = document.createElement('div');
     host.className = 'modal-host';
+    const leaderships = (forest.leaderships || []);
+    host.innerHTML = `
+      <div class="modal" style="width: min(580px, 94vw); max-height: 92vh; overflow-y: auto;">
+        <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">ניהול יער</div>
+        <h3 style="margin: 6px 0 6px;">🌲 ${util.escapeHtml(forest.name)} <span style="color: var(--text-mid); font-size: 13px;">(${util.escapeHtml(forest.region || '')})</span></h3>
+        <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">בחר הנהגה (סבב) לניהול. כל הנהגה הינה ישות נפרדת לחלוטין: משתמשים, דוחות, חניכים, מטבחים — מבודדים הרמטית.</p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${leaderships.length === 0 ? '<div style="padding:14px; color: var(--text-mid); text-align:center;">לא הוגדרו הנהגות ליער זה.</div>' : leaderships.map(l => `
+            <button class="leadership-card" data-leadership="${l.id}" style="text-align:right; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; cursor:pointer; transition: all .15s;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-family: var(--font-ui); font-weight: 700; font-size: 15px; color: var(--text-hi);">${util.escapeHtml(l.name)}</div>
+                  <div style="font-size: 11px; color: var(--text-mid); margin-top: 4px;">
+                    ${l.start ? util.escapeHtml(l.start) : '—'} → ${l.end ? util.escapeHtml(l.end) : '—'}
+                  </div>
+                </div>
+                <span class="chip ${l.status === 'closed' ? 'chip--warn' : 'chip--ok'}" style="font-size: 11px;">${l.status === 'closed' ? '🔒 נסגר' : 'פעיל'}</span>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:10px; margin-top: 18px;">
+          <button class="btn btn--ghost" data-enter-forest>פתח דשבורד יער (חמ"ל)</button>
+          <button class="btn btn--ghost" data-close>סגור</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+    host.querySelector('[data-close]').addEventListener('click', () => host.remove());
+    host.querySelector('[data-enter-forest]').addEventListener('click', () => {
+      host.remove();
+      ScoutDB.appendAudit({ action: 'NATIONAL-FOREST-ENTER', channel: 'auth', details: `מנהל ארצי נכנס לדשבורד יער ${forest.name}` });
+      location.href = 'hq-operator.html?forest=' + forest.id;
+    });
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+    host.addEventListener('click', e => {
+      const card = e.target.closest('.leadership-card');
+      if (!card) return;
+      const lead = leaderships.find(l => l.id === card.dataset.leadership);
+      host.remove();
+      openLeadershipActions(forest, lead);
+    });
+  }
+
+  // Per-leadership action menu: provision core users + end camp
+  function openLeadershipActions(forest, lead) {
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    const isClosed = lead.status === 'closed';
+    host.innerHTML = `
+      <div class="modal" style="width: min(560px, 94vw);">
+        <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">ניהול הנהגה</div>
+        <h3 style="margin: 6px 0 2px;">🌲 ${util.escapeHtml(forest.name)} · ${util.escapeHtml(lead.name)}</h3>
+        <div style="color: var(--text-mid); font-size: 12px; margin-bottom: 14px;">
+          ${lead.start || '—'} → ${lead.end || '—'}
+          ${isClosed ? ' · <span style="color: var(--warn);">🔒 הנהגה זו נסגרה</span>' : ''}
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn btn--primary" data-act="provision" ${isClosed ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
+            👥 הפקת משתמשי ליבה (קב"ט + מנהל מחנה + אחראי חמ"ל)
+          </button>
+          <button class="btn btn--ghost" data-act="provision-extra" ${isClosed ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
+            + הקם משתמש בודד להנהגה זו
+          </button>
+          <button class="btn" style="border-color: var(--danger); color: var(--danger);" data-act="end" ${isClosed ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
+            🏁 סיים מחנה (נעילה + דוח סיכום)
+          </button>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 18px;">
+          <button class="btn btn--ghost" data-close>סגור</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+    host.querySelector('[data-close]').addEventListener('click', () => host.remove());
+    host.addEventListener('click', e => { if (e.target === host) host.remove(); });
+    host.addEventListener('click', e => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn || btn.disabled) return;
+      if (btn.dataset.act === 'provision') {
+        const r = Scout.Forests.provisionCoreUsers(forest.id, lead.id);
+        host.remove();
+        if (!r.ok) { Toast.show(r.error, { kind: 'danger' }); return; }
+        showForestCredentialsModal(forest, lead, r.coreUsers);
+      }
+      if (btn.dataset.act === 'provision-extra') {
+        host.remove();
+        openProvisionUserModal({ forestId: forest.id, leadershipId: lead.id });
+      }
+      if (btn.dataset.act === 'end') {
+        if (!confirm(`לסיים את המחנה ולנעול את ${lead.name} ביער ${forest.name}? פעולה זו תייצר דוח סיכום ותחסום הקמת משתמשים חדשים להנהגה זו.`)) return;
+        const r = Scout.Forests.endCamp(forest.id, lead.id);
+        host.remove();
+        if (!r.ok) { Toast.show(r.error, { kind: 'danger' }); return; }
+        showEndCampReport(r.forest, r.leadership, r.report);
+        renderForests();
+      }
+    });
+  }
+
+  function showEndCampReport(forest, lead, report) {
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    const inc = report.incidents || {};
+    const lg = report.logistics || {};
+    const sup = report.staff || {};
+    host.innerHTML = `
+      <div class="modal" style="width: min(680px, 94vw); max-height: 92vh; overflow-y: auto;">
+        <div style="color: var(--ok); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">🏁 דוח סיכום מחנה</div>
+        <h3 style="margin: 6px 0 4px;">${util.escapeHtml(forest.name)} · ${util.escapeHtml(lead.name)}</h3>
+        <div style="color: var(--text-mid); font-size: 12px; margin-bottom: 14px;">
+          ${lead.start || '—'} → ${lead.end || '—'} · נסגר ע"י ${util.escapeHtml(UI.currentPersona().name)}
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px;">
+          <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;">
+            <div style="font-size: 11px; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em;">דוח חמ"ל — אירועים</div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--accent); margin-top: 4px;">${inc.total || 0}</div>
+            <div style="font-size: 11px; color: var(--text-mid);">${inc.closed || 0} נסגרו · ${inc.open || 0} פתוחים</div>
+          </div>
+          <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;">
+            <div style="font-size: 11px; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em;">דוח אקונומיה</div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--ok); margin-top: 4px;">${lg.busesProcessed || 0}</div>
+            <div style="font-size: 11px; color: var(--text-mid);">תנועות אוטובוסים</div>
+          </div>
+          <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;">
+            <div style="font-size: 11px; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em;">דוח קב"ט — סגל</div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--warn); margin-top: 4px;">${sup.totalActions || 0}</div>
+            <div style="font-size: 11px; color: var(--text-mid);">פעולות בלוג</div>
+          </div>
+        </div>
+
+        ${(report.debriefs && report.debriefs.length) ? `
+          <div style="font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px;">תחקירי אירועים סגורים</div>
+          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 14px;">
+            ${report.debriefs.map(d => `
+              <div style="padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px;">
+                <strong>${util.escapeHtml(d.title || '—')}</strong>
+                <span style="color: var(--text-mid);"> · ${util.escapeHtml(d.priority || '')} · ${util.escapeHtml(d.closedBy || '')}</span>
+                ${d.debrief ? `<div style="color: var(--text-mid); margin-top: 4px;">${util.escapeHtml(String(d.debrief).slice(0, 200))}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <div style="background: rgba(255,181,71,0.08); border: 1px solid rgba(255,181,71,0.3); border-radius: var(--r-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-mid);">
+          📌 ייצוא PDF / Excel — בגרסה הזו: השתמשו בכפתורי ההדפסה של הדפדפן (Ctrl/Cmd + P).
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn btn--ghost" data-print>🖨 הדפסה / שמירה כ-PDF</button>
+          <button class="btn btn--primary" data-close>סגור</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+    host.querySelector('[data-print]').addEventListener('click', () => window.print());
+    host.querySelector('[data-close]').addEventListener('click', () => host.remove());
+  }
+
+  // "פרטי התחברות ליער החדש" — sticky modal, only closes via the Close button
+  function showForestCredentialsModal(forest, lead, coreUsers) {
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    const leadLabel = lead ? ` · ${lead.name}` : '';
     const rows = coreUsers.map(u => `
       <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 8px;">
         <div style="font-family: var(--font-ui); font-weight: 700; font-size: 13px; margin-bottom: 8px;">${util.escapeHtml(u.roleLabel)}</div>
@@ -681,8 +900,8 @@
     host.innerHTML = `
       <div class="modal" style="width: min(560px, 92vw); max-height: 92vh; overflow-y: auto;">
         <div style="color: var(--ok); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">✓ היער הוקם — פרטי התחברות</div>
-        <h3 style="margin: 6px 0 4px;">🌲 ${util.escapeHtml(forest.name)} <span style="color: var(--text-mid); font-size: 13px;">(${util.escapeHtml(forest.region)})</span></h3>
-        <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">נוצרו אוטומטית 3 משתמשי ליבה זמניים. העתק ושלח לצוות בשטח — בכניסה הראשונה יוגדר פרופיל קבוע.</p>
+        <h3 style="margin: 6px 0 4px;">🌲 ${util.escapeHtml(forest.name)}${util.escapeHtml(leadLabel)} <span style="color: var(--text-mid); font-size: 13px;">(${util.escapeHtml(forest.region)})</span></h3>
+        <p style="color: var(--text-mid); margin: 0 0 14px; font-size: 13px;">נוצרו אוטומטית 3 משתמשי ליבה זמניים המשויכים ספציפית לשילוב יער + הנהגה. העתק ושלח לצוות — בכניסה הראשונה יוגדר פרופיל קבוע.</p>
         ${rows}
         <div style="background: rgba(255,181,71,0.08); border: 1px solid rgba(255,181,71,0.3); border-radius: var(--r-sm); padding: 10px 14px; margin: 8px 0 14px; font-size: 12px; color: var(--text-mid);">
           ⚠ הסיסמאות מוצגות פעם אחת בלבד. ודא שהעתקת לפני סגירה.
@@ -705,7 +924,7 @@
     host.addEventListener('click', e => {
       if (e.target.dataset.copy) { copyText(e.target.dataset.copy); return; }
       if (e.target.dataset.copyAll !== undefined && e.target.closest('[data-copy-all]')) {
-        const all = `יער: ${forest.name}\n\n` + coreUsers.map(u => `${u.roleLabel}\nשם משתמש: ${u.tempUsername}\nסיסמה: ${u.tempPassword}`).join('\n\n');
+        const all = `יער: ${forest.name}${leadLabel}\n\n` + coreUsers.map(u => `${u.roleLabel}\nשם משתמש: ${u.tempUsername}\nסיסמה: ${u.tempPassword}`).join('\n\n');
         copyText(all);
         return;
       }
@@ -714,7 +933,8 @@
     });
   }
 
-  function openProvisionUserModal() {
+  function openProvisionUserModal(preset) {
+    preset = preset || {};
     const persona = UI.currentPersona();
     const Provisioning = Scout.RoleProvisioning;
     const allRoles = Object.entries(UI.ROLE_LABELS);
@@ -724,22 +944,30 @@
     const host = document.createElement('div');
     host.className = 'modal-host';
     host.innerHTML = `
-      <form class="modal" style="width: min(560px, 92vw);">
+      <form class="modal" style="width: min(580px, 94vw);">
         <div style="color: var(--accent); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">+ הקמת משתמש קצה</div>
         <h3 style="margin: 6px 0 4px;">הנפק חשבון חדש למערכת</h3>
         <p style="color: var(--text-mid); margin: 0 0 12px; font-size: 13px;">${util.escapeHtml(Provisioning.explanation(persona.role))}</p>
 
         <div style="margin-bottom: 12px;">
-          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">שייך ליער *</label>
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">1. שייך ליער *</label>
           <select class="select" name="forestId" required>
-            <option value="" disabled selected>— בחר יער —</option>
-            ${Scout.Forests.list().map(f => `<option value="${f.id}">${util.escapeHtml(f.name)} · ${util.escapeHtml(f.region || '')}</option>`).join('')}
+            <option value="" disabled ${preset.forestId ? '' : 'selected'}>— בחר יער —</option>
+            ${Scout.Forests.list().map(f => `<option value="${f.id}" ${preset.forestId === f.id ? 'selected' : ''}>${util.escapeHtml(f.name)} · ${util.escapeHtml(f.region || '')}</option>`).join('')}
           </select>
           ${Scout.Forests.list().length === 0 ? '<div style="font-size: 11px; color: var(--warn); margin-top: 4px;">⚠ אין יערות. הקם יער קודם.</div>' : ''}
         </div>
 
         <div style="margin-bottom: 12px;">
-          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">בחר תפקיד *</label>
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">2. שייך להנהגה (סבב) *</label>
+          <select class="select" name="leadershipId" required>
+            <option value="" disabled selected>— בחר יער קודם —</option>
+          </select>
+          <div style="font-size: 11px; color: var(--text-mid); margin-top: 4px;">המשתמש יראה רק נתוני היער + הנהגה הספציפיים שנבחרו (Token Lock).</div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">3. בחר תפקיד *</label>
           <select class="select" name="role" required>
             <option value="" disabled selected>— בחר —</option>
             ${canIssueRoles.map(([k, l]) => `<option value="${k}">${util.escapeHtml(l)}</option>`).join('')}
@@ -761,19 +989,41 @@
     `;
     document.body.appendChild(host);
     const form = host.querySelector('form');
+    const fSel = form.forestId;
+    const lSel = form.leadershipId;
+
+    function refreshLeaderships(selectedLeadId) {
+      const fid = fSel.value;
+      if (!fid) {
+        lSel.innerHTML = '<option value="" disabled selected>— בחר יער קודם —</option>';
+        return;
+      }
+      const leads = Scout.Forests.leaderships(fid) || [];
+      if (leads.length === 0) {
+        lSel.innerHTML = '<option value="" disabled selected>— אין הנהגות —</option>';
+      } else {
+        lSel.innerHTML = '<option value="" disabled ' + (selectedLeadId ? '' : 'selected') + '>— בחר הנהגה —</option>' +
+          leads.map(l => `<option value="${l.id}" ${selectedLeadId === l.id ? 'selected' : ''} ${l.status === 'closed' ? 'disabled' : ''}>${util.escapeHtml(l.name)}${l.status === 'closed' ? ' (סגור)' : ''}</option>`).join('');
+      }
+    }
+    fSel.addEventListener('change', () => refreshLeaderships());
+    if (preset.forestId) refreshLeaderships(preset.leadershipId);
+
     host.querySelector('[data-cancel]').addEventListener('click', () => host.remove());
     host.addEventListener('click', e => { if (e.target === host) host.remove(); });
     form.addEventListener('submit', e => {
       e.preventDefault();
       const role = form.role.value;
       const forestId = form.forestId.value;
+      const leadershipId = form.leadershipId.value;
       if (!role) return;
       if (!forestId) { Toast.show('יש לבחור יער לשיוך המשתמש.', { kind: 'warn' }); return; }
+      if (!leadershipId) { Toast.show('יש לבחור הנהגה (סבב) לשיוך המשתמש.', { kind: 'warn' }); return; }
       if (!Provisioning.canIssue(persona.role, role)) {
         Toast.show('🔒 אין לך הרשאה ליצור משתמש מסוג זה.', { kind: 'danger' });
         return;
       }
-      const r = Scout.Auth.issueTempUser(role, { forestId });
+      const r = Scout.Auth.issueTempUser(role, { forestId, leadershipId });
       host.remove();
       showProvisionResult(r);
     });
@@ -786,7 +1036,7 @@
       <div class="modal" style="width: min(520px, 92vw);">
         <div style="color: var(--ok); font-family: var(--font-ui); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 11px;">✓ משתמש הונפק</div>
         <h3 style="margin: 6px 0 6px;">פרטי גישה זמניים</h3>
-        <div style="color: var(--text-mid); font-size: 13px; margin-bottom: 14px;">${util.escapeHtml(UI.ROLE_LABELS[r.role] || r.role)}${r.forestId ? ' · יער ' + util.escapeHtml((Scout.Forests.get(r.forestId) || {}).name || '') : ''}</div>
+        <div style="color: var(--text-mid); font-size: 13px; margin-bottom: 14px;">${util.escapeHtml(UI.ROLE_LABELS[r.role] || r.role)}${r.forestId ? ' · יער ' + util.escapeHtml((Scout.Forests.get(r.forestId) || {}).name || '') : ''}${r.leadershipId ? ' · ' + util.escapeHtml(((Scout.Forests.leadership(r.forestId, r.leadershipId)) || {}).name || '') : ''}</div>
         <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; margin-bottom: 10px;">
           <div style="font-size: 11px; color: var(--text-low); text-transform: uppercase; letter-spacing: .12em;">שם משתמש</div>
           <div style="font-family: var(--font-mono); font-size: 20px; color: var(--accent); font-weight: 700;">${util.escapeHtml(r.tempUsername)}</div>
