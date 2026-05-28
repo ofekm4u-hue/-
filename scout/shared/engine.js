@@ -2521,18 +2521,24 @@
       Bus.emit('campmap:updated', { forestId: fid, leadershipId: lid, by: next.updatedBy });
       return { ok: true, map: next };
     }
-    function placeTribe(tribeId, name, x, y, color) {
-      const m = load();
+    function placeTribe(tribeId, name, x, y, color, ctx) {
+      ctx = ctx || {};
+      const fid = ctx.forestId || Tenancy.ownForest();
+      const lid = ctx.leadershipId || Tenancy.ownLeadership();
+      const m = load(fid, lid);
       const arr = (m.tribes || []).slice();
       const idx = arr.findIndex(t => t.id === tribeId);
       const entry = { id: tribeId, name, x, y, color: color || '#4DD0E1' };
       if (idx >= 0) arr[idx] = entry;
       else arr.push(entry);
-      return save(Object.assign({}, m, { tribes: arr }));
+      return save(Object.assign({}, m, { tribes: arr, forestId: fid, leadershipId: lid }));
     }
-    function removeTribe(tribeId) {
-      const m = load();
-      return save(Object.assign({}, m, { tribes: (m.tribes || []).filter(t => t.id !== tribeId) }));
+    function removeTribe(tribeId, ctx) {
+      ctx = ctx || {};
+      const fid = ctx.forestId || Tenancy.ownForest();
+      const lid = ctx.leadershipId || Tenancy.ownLeadership();
+      const m = load(fid, lid);
+      return save(Object.assign({}, m, { tribes: (m.tribes || []).filter(t => t.id !== tribeId), forestId: fid, leadershipId: lid }));
     }
     return { load, save, placeTribe, removeTribe, canEdit };
   })();

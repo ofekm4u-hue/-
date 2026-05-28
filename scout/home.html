@@ -305,6 +305,7 @@
         <div style="display:grid; gap: 8px;">
           <button class="btn btn--primary" id="btn-create-forest">+ הקם יער חדש</button>
           <button class="btn" id="btn-provision-user">👥 הקם משתמש חדש למערכת</button>
+          <button class="btn" id="btn-campmap-editor">🗺 עורך מפות מחנה (כל יער + הנהגה)</button>
           <button class="btn" id="btn-purge-users">🗑 איפוס משתמשים בלבד</button>
         </div>
         <div style="margin-top: 10px; padding: 8px 12px; background: rgba(77,208,225,0.08); border: 1px dashed rgba(77,208,225,0.32); border-radius: var(--r-sm); font-size: 11px; color: var(--text-mid);">
@@ -517,6 +518,7 @@
 
   document.getElementById('btn-create-forest').addEventListener('click', openCreateForestModal);
   document.getElementById('btn-provision-user').addEventListener('click', openProvisionUserModal);
+  document.getElementById('btn-campmap-editor').addEventListener('click', () => { location.href = 'campmap.html'; });
   document.getElementById('btn-purge-users').addEventListener('click', openPurgeModal);
   document.getElementById('btn-hard-reset').addEventListener('click', openHardResetModal);
 
@@ -780,6 +782,9 @@
           <button class="btn btn--ghost" data-act="provision-extra" ${isClosed ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
             + הקם משתמש בודד להנהגה זו
           </button>
+          <button class="btn" data-act="campmap">
+            🗺 ערוך מפת מחנה (מנהל ארצי)
+          </button>
           <button class="btn" style="border-color: var(--danger); color: var(--danger);" data-act="end" ${isClosed ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
             🏁 סיים מחנה (נעילה + דוח סיכום)
           </button>
@@ -805,6 +810,10 @@
       if (btn.dataset.act === 'provision-extra') {
         host.remove();
         openProvisionUserModal({ forestId: forest.id, leadershipId: lead.id });
+      }
+      if (btn.dataset.act === 'campmap') {
+        host.remove();
+        location.href = 'campmap.html?forest=' + encodeURIComponent(forest.id) + '&leadership=' + encodeURIComponent(lead.id);
       }
       if (btn.dataset.act === 'end') {
         if (!confirm(`לסיים את המחנה ולנעול את ${lead.name} ביער ${forest.name}? פעולה זו תייצר דוח סיכום ותחסום הקמת משתמשים חדשים להנהגה זו.`)) return;
