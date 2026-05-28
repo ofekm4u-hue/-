@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>שו"ב | תברואן — Sanitation & Health Inspector</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<style>
+  .page { padding: 16px; max-width: 1320px; margin: 0 auto; }
+
+  .scope-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+  .scope-bar .lock {
+    color: var(--ok);
+    font-weight: 700;
+  }
+  .scope-bar .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(77,208,225,0.08);
+    border: 1px solid rgba(77,208,225,0.3);
+    color: var(--accent);
+    font-weight: 600;
+    font-family: var(--font-ui);
+    font-size: 12px;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .tabs button {
+    padding: 12px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: var(--text-mid);
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .tabs button:hover { color: var(--text-hi); }
+  .tabs button.active {
+    background: rgba(77,208,225,0.10);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .panel-pad { padding: 16px; }
+
+  .task-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 900px) {
+    .task-grid { grid-template-columns: repeat(2, 1fr); }
+    .tabs { grid-template-columns: repeat(2, 1fr); }
+  }
+  .cat-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 14px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .cat-card:hover { border-color: var(--accent); }
+  .cat-card.active { border-color: var(--accent); background: rgba(77,208,225,0.08); }
+  .cat-card .ico { font-size: 22px; }
+  .cat-card .lbl {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 13px;
+    margin-top: 6px;
+  }
+  .cat-card .count {
+    font-size: 11px;
+    color: var(--text-mid);
+    margin-top: 3px;
+  }
+
+  .add-form {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) auto;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+  .add-form label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-mid);
+    margin-bottom: 4px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  @media (max-width: 800px) {
+    .add-form { grid-template-columns: 1fr 1fr; }
+  }
+
+  table.tbl { width: 100%; border-collapse: collapse; }
+  table.tbl th { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .08em; }
+  table.tbl td { padding: 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+  .checklist {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+  }
+  .check-row label {
+    flex: 1;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .check-row input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--ok);
+  }
+
+  .sig-block {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  .sig-canvas {
+    width: 100%;
+    height: 140px;
+    background: #fff;
+    border-radius: var(--r-sm);
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .sig-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: flex-end;
+  }
+
+  .alert-form {
+    background: rgba(255,71,87,0.06);
+    border: 1px solid rgba(255,71,87,0.32);
+    border-radius: var(--r-md);
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .map-stage {
+    height: 480px;
+    background:
+      linear-gradient(180deg, #0d1620 0%, #122131 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    position: relative;
+    overflow: hidden;
+  }
+  .map-stage::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(77,208,225,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77,208,225,0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  .tribe-pin {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: var(--bg-elev);
+    border: 2px solid var(--accent);
+    border-radius: var(--r-md);
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-hi);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+  }
+  .map-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-mid);
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ro-note {
+    font-size: 11px;
+    color: var(--text-mid);
+    padding: 8px 12px;
+    background: rgba(91,141,239,0.08);
+    border: 1px solid rgba(91,141,239,0.3);
+    border-radius: var(--r-sm);
+    margin-bottom: 10px;
+  }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .toggle-btn-grp { display: inline-flex; gap: 6px; }
+  .toggle-btn-grp button {
+    padding: 6px 12px;
+    border-radius: var(--r-sm);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-mid);
+  }
+  .toggle-btn-grp button.on {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+</style>
+</head>
+<body>
+<div id="header"></div>
+<main class="page">
+
+  <div class="scope-bar">
+    <span class="lock">🔒</span>
+    <span>פעולותיך נעולות ל:</span>
+    <span class="pill" id="scope-forest">—</span>
+    <span class="pill" id="scope-leadership">—</span>
+    <span style="color: var(--text-mid); margin-right: auto; font-size: 11px;">דאטה של הנהגות אחרות אינו נגיש לך.</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="tasks" class="active">א. משימות ויער נקי</button>
+    <button data-tab="kitchens">ב. ביקורת מטבחים</button>
+    <button data-tab="alerts">ג. התראות לחמ"ל</button>
+    <button data-tab="map">ד. מפת מחנה</button>
+  </div>
+
+  <!-- Tab A: Tasks -->
+  <section class="tab-pane active" id="pane-tasks">
+    <div class="panel panel-pad">
+      <h3 style="margin: 0 0 12px;">מודול משימות וסטטוס תפעולי</h3>
+      <div class="task-grid" id="cat-grid"></div>
+
+      <form id="add-task-form" class="add-form">
+        <div>
+          <label>קטגוריה</label>
+          <select class="select" name="category" id="task-cat">
+          </select>
+        </div>
+        <div>
+          <label>תיאור משימה *</label>
+          <input class="input" name="title" required placeholder='לדוגמה: "פינוי פח 3 בכניסה"'>
+        </div>
+        <div>
+          <label>מיקום</label>
+          <input class="input" name="location" placeholder='שבט / אזור'>
+        </div>
+        <div>
+          <label>עדיפות</label>
+          <select class="select" name="priority">
+            <option value="normal">רגיל</option>
+            <option value="high">דחוף</option>
+            <option value="low">נמוך</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn--primary">+ הוסף</button>
+      </form>
+
+      <h4 style="margin: 6px 0 8px;">משימות פעילות</h4>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>שעה</th>
+            <th>קטגוריה</th>
+            <th>תיאור</th>
+            <th>מיקום</th>
+            <th>עדיפות</th>
+            <th>סטטוס</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tasks-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Tab B: Kitchen inspections -->
+  <section class="tab-pane" id="pane-kitchens">
+    <div class="panel panel-pad">
+      <h3 style="margin: 0 0 6px;">מודול ביקורת מטבחים</h3>
+      <p style="color: var(--text-mid); margin: 0 0 12px; font-size: 13px;">בחר שבט, סמן את הפריטים שעברו, הוסף הערות, וקבל חתימה דיגיטלית מנציג המטבח.</p>
+
+      <form id="inspection-form">
+        <div class="add-form" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 12px;">
+          <div>
+            <label>שבט *</label>
+            <select class="select" name="tribe" id="tribe-sel" required>
+              <option value="" disabled selected>— בחר שבט —</option>
+            </select>
+          </div>
+          <div>
+            <label>שם המטבח</label>
+            <input class="input" name="kitchenName" placeholder='לדוגמה: "מטבח שבט אלון"'>
+          </div>
+          <div>
+            <label>שם נציג המטבח</label>
+            <input class="input" name="repName" placeholder='לחתימה'>
+          </div>
+        </div>
+
+        <div class="checklist" id="checklist"></div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">הערות התברואן</label>
+          <textarea class="input" name="notes" rows="2" placeholder="לדוגמה: 'יש לרכוש מד-טמפרטורה דיגיטלי למקרר הראשי'"></textarea>
+        </div>
+
+        <div class="sig-block">
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px;">חתימת נציג המטבח (אצבע על מסך)</label>
+          <canvas class="sig-canvas" id="sig-canvas"></canvas>
+          <div class="sig-actions">
+            <button type="button" class="btn btn--sm btn--ghost" id="sig-clear">נקה חתימה</button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button type="submit" class="btn btn--primary">📝 הגש דוח ביקורת</button>
+        </div>
+      </form>
+
+      <h4 style="margin: 18px 0 8px;">ארכיון ביקורות</h4>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>תאריך</th>
+            <th>שבט / מטבח</th>
+            <th>תברואן</th>
+            <th>ציון</th>
+            <th>חתימה</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="inspections-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Tab C: Alerts to HQ -->
+  <section class="tab-pane" id="pane-alerts">
+    <div class="panel panel-pad">
+      <h3 style="margin: 0 0 6px;">מערכת התראות דחופה — חמ"ל</h3>
+      <p style="color: var(--text-mid); margin: 0 0 12px; font-size: 13px;">פתיחת התראה תופיע מיידית במסך החמ"ל של היער + ההנהגה שלך, ותיווסף ליומן האירועים.</p>
+
+      <form id="alert-form" class="alert-form">
+        <div class="add-form" style="grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label>כותרת ההתראה *</label>
+            <input class="input" name="title" required placeholder='לדוגמה: "הפסקת מים במטבח שבט אלון"'>
+          </div>
+          <div>
+            <label>חומרה</label>
+            <select class="select" name="severity">
+              <option value="urgent" selected>דחוף</option>
+              <option value="critical">קריטי</option>
+              <option value="info">לידיעה</option>
+            </select>
+          </div>
+          <div>
+            <label>מיקום</label>
+            <input class="input" name="location" placeholder='שבט / אזור'>
+          </div>
+        </div>
+        <div style="margin-top: 8px;">
+          <label style="display:block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px;">פירוט</label>
+          <textarea class="input" name="details" rows="2" placeholder='פירוט קצר — מה נדרש מהחמ"ל'></textarea>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 10px;">
+          <button type="submit" class="btn btn--danger">🚨 שלח התראה לחמ"ל</button>
+        </div>
+      </form>
+
+      <h4 style="margin: 12px 0 8px;">התראות שלי</h4>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>שעה</th>
+            <th>כותרת</th>
+            <th>חומרה</th>
+            <th>מיקום</th>
+            <th>סטטוס</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="alerts-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Tab D: Camp map (read-only) -->
+  <section class="tab-pane" id="pane-map">
+    <div class="panel panel-pad">
+      <h3 style="margin: 0 0 6px;">מפת מחנה — צפייה בלבד</h3>
+      <div class="ro-note">🔒 צפייה בלבד. עריכת המיקומים מתבצעת ע"י מנהל המחנה בלבד. השינויים מסונכרנים אצלך בזמן אמת.</div>
+      <div class="map-stage" id="map-stage"></div>
+      <div style="margin-top: 8px; font-size: 11px; color: var(--text-mid);" id="map-meta">לא הוגדרו מיקומי שבטים עדיין.</div>
+    </div>
+  </section>
+
+</main>
+
+<script src="shared/engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { ScoutDB, Bus, UI, Toast, util, Auth, Sanitation, Tenancy, CampMap, Forests } = Scout;
+
+  if (!Auth.requireLogin()) return;
+
+  // Role enforcement — only sanitation can be here
+  const persona = UI.currentPersona();
+  if (persona.role !== 'sanitation' && persona.role !== 'national') {
+    Toast.show('🔒 דשבורד זה זמין לתברואן בלבד.', { kind: 'danger' });
+    setTimeout(() => location.replace(Auth.routeForRole(persona.role)), 1200);
+    return;
+  }
+
+  document.getElementById('header').innerHTML = UI.header({ title: 'תברואן — Sanitation Inspector' });
+  UI.bindHeader(document.body);
+  UI.mockBadge('דמו פרזנטציה');
+
+  // Render scope bar
+  const fid = Tenancy.ownForest();
+  const lid = Tenancy.ownLeadership();
+  const forest = fid ? Forests.get(fid) : null;
+  const lead = (fid && lid) ? Forests.leadership(fid, lid) : null;
+  document.getElementById('scope-forest').textContent = forest ? ('🌲 ' + forest.name) : 'יער לא משויך';
+  document.getElementById('scope-leadership').textContent = lead ? ('📅 ' + lead.name) : 'הנהגה לא משויכת';
+
+  // ===== Tabs =====
+  document.querySelector('.tabs').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    const id = btn.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + id));
+    if (id === 'map') renderMap();
+  });
+
+  // ===== Tab A: Tasks =====
+  const CATS = Sanitation.TASK_CATEGORIES;
+  const CAT_ICONS = { garbage: '🗑', toilets: '🚻', cleanliness: '🌿', pest: '🦟' };
+
+  let activeCat = 'cleanliness';
+
+  function renderCatGrid() {
+    const all = Sanitation.tasks();
+    document.getElementById('cat-grid').innerHTML = CATS.map(c => {
+      const open = all.filter(t => t.category === c.id && t.status === 'open').length;
+      return `
+        <div class="cat-card ${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}">
+          <div class="ico">${CAT_ICONS[c.id] || '•'}</div>
+          <div class="lbl">${util.escapeHtml(c.label)}</div>
+          <div class="count">${open} פתוחות</div>
+        </div>
+      `;
+    }).join('');
+    // Populate the form select
+    const sel = document.getElementById('task-cat');
+    sel.innerHTML = CATS.map(c => `<option value="${c.id}" ${c.id === activeCat ? 'selected' : ''}>${util.escapeHtml(c.label)}</option>`).join('');
+  }
+  document.getElementById('cat-grid').addEventListener('click', e => {
+    const card = e.target.closest('.cat-card');
+    if (!card) return;
+    activeCat = card.dataset.cat;
+    renderCatGrid();
+    renderTasks();
+  });
+
+  function renderTasks() {
+    const all = Sanitation.tasks().filter(t => t.category === activeCat).sort((a, b) => b.ts - a.ts);
+    document.getElementById('tasks-body').innerHTML = all.length ? all.map(t => `
+      <tr>
+        <td style="font-family: var(--font-mono); color: var(--text-low);">${util.fmtTime(t.ts)}</td>
+        <td>${util.escapeHtml((CATS.find(c => c.id === t.category) || {}).label || t.category)}</td>
+        <td><strong>${util.escapeHtml(t.title)}</strong>${t.notes ? '<br><span style="font-size:11px;color:var(--text-mid);">' + util.escapeHtml(t.notes) + '</span>' : ''}</td>
+        <td>${util.escapeHtml(t.location || '—')}</td>
+        <td>${t.priority === 'high' ? '<span class="chip chip--danger">דחוף</span>' : (t.priority === 'low' ? '<span class="chip">נמוך</span>' : '<span class="chip chip--info">רגיל</span>')}</td>
+        <td>${t.status === 'done' ? '<span class="chip chip--ok">בוצע</span>' : '<span class="chip chip--warn">פתוח</span>'}</td>
+        <td>
+          ${t.status === 'open'
+            ? `<button class="btn btn--sm btn--ok" data-done="${t.id}">סמן כבוצע</button>`
+            : `<button class="btn btn--sm btn--ghost" data-reopen="${t.id}">פתח שוב</button>`}
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" style="text-align:center; color: var(--text-low); padding: 22px;">אין משימות בקטגוריה זו.</td></tr>';
+  }
+
+  document.getElementById('add-task-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target;
+    Sanitation.addTask({
+      category: f.category.value,
+      title: f.title.value.trim(),
+      location: f.location.value.trim(),
+      priority: f.priority.value,
+    });
+    Toast.show('משימה נוספה', { kind: 'ok' });
+    f.reset();
+    f.category.value = activeCat;
+    renderCatGrid();
+    renderTasks();
+  });
+
+  document.getElementById('tasks-body').addEventListener('click', e => {
+    const done = e.target.dataset.done, reopen = e.target.dataset.reopen;
+    if (done) { Sanitation.setTaskStatus(done, 'done'); Toast.show('סומן כבוצע', { kind: 'ok' }); renderCatGrid(); renderTasks(); }
+    if (reopen) { Sanitation.setTaskStatus(reopen, 'open'); renderCatGrid(); renderTasks(); }
+  });
+
+  // ===== Tab B: Kitchen inspections =====
+  function populateTribes() {
+    const tribes = Tenancy.filter(ScoutDB.get('tribes', []) || []);
+    document.getElementById('tribe-sel').innerHTML = '<option value="" disabled selected>— בחר שבט —</option>' +
+      tribes.map(t => `<option value="${util.escapeHtml(t.name)}">${util.escapeHtml(t.name)}</option>`).join('');
+  }
+  populateTribes();
+
+  function renderChecklist() {
+    document.getElementById('checklist').innerHTML = Sanitation.KITCHEN_CHECKLIST.map(item => `
+      <div class="check-row">
+        <input type="checkbox" id="chk-${item.id}" data-check="${item.id}">
+        <label for="chk-${item.id}">${util.escapeHtml(item.label)}</label>
+      </div>
+    `).join('');
+  }
+  renderChecklist();
+
+  // Signature pad
+  const sigCanvas = document.getElementById('sig-canvas');
+  const sigCtx = sigCanvas.getContext('2d');
+  function resizeSig() {
+    const rect = sigCanvas.getBoundingClientRect();
+    sigCanvas.width = rect.width;
+    sigCanvas.height = rect.height;
+    sigCtx.strokeStyle = '#0A0E14';
+    sigCtx.lineWidth = 2;
+    sigCtx.lineCap = 'round';
+    sigCtx.lineJoin = 'round';
+  }
+  resizeSig();
+  window.addEventListener('resize', resizeSig);
+  let drawing = false, lastX = 0, lastY = 0, hasSig = false;
+  function getPos(e) {
+    const r = sigCanvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) return [e.touches[0].clientX - r.left, e.touches[0].clientY - r.top];
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+  function startDraw(e) { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e); hasSig = true; }
+  function moveDraw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const [x, y] = getPos(e);
+    sigCtx.beginPath();
+    sigCtx.moveTo(lastX, lastY);
+    sigCtx.lineTo(x, y);
+    sigCtx.stroke();
+    [lastX, lastY] = [x, y];
+  }
+  function endDraw() { drawing = false; }
+  sigCanvas.addEventListener('pointerdown', startDraw);
+  sigCanvas.addEventListener('pointermove', moveDraw);
+  sigCanvas.addEventListener('pointerup', endDraw);
+  sigCanvas.addEventListener('pointerleave', endDraw);
+  document.getElementById('sig-clear').addEventListener('click', () => {
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    hasSig = false;
+  });
+
+  document.getElementById('inspection-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target;
+    const tribe = f.tribe.value;
+    if (!tribe) { Toast.show('בחר שבט', { kind: 'warn' }); return; }
+    if (!hasSig) { Toast.show('נדרשת חתימה של נציג המטבח', { kind: 'warn' }); return; }
+    const checklist = Sanitation.KITCHEN_CHECKLIST.map(item => ({
+      id: item.id,
+      label: item.label,
+      pass: !!document.getElementById('chk-' + item.id).checked,
+    }));
+    const sigData = sigCanvas.toDataURL('image/png');
+    const r = Sanitation.fileInspection({
+      tribe,
+      kitchenName: f.kitchenName.value.trim() || ('מטבח ' + tribe),
+      checklist,
+      notes: f.notes.value.trim(),
+      sigRep: sigData,
+      repName: f.repName.value.trim(),
+    });
+    Toast.show(`דוח ביקורת נשמר (${r.score}%)`, { kind: 'ok' });
+    f.reset();
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    hasSig = false;
+    populateTribes();
+    renderChecklist();
+    renderInspections();
+  });
+
+  function renderInspections() {
+    const all = Sanitation.inspections().sort((a, b) => b.ts - a.ts);
+    document.getElementById('inspections-body').innerHTML = all.length ? all.map(r => `
+      <tr>
+        <td style="font-family: var(--font-mono); color: var(--text-low);">${util.fmtDate(r.ts)} ${util.fmtTime(r.ts)}</td>
+        <td><strong>${util.escapeHtml(r.tribe)}</strong><br><span style="font-size:11px; color: var(--text-mid);">${util.escapeHtml(r.kitchenName)}</span></td>
+        <td>${util.escapeHtml(r.inspector)}</td>
+        <td>
+          <span class="chip ${r.score >= 90 ? 'chip--ok' : (r.score >= 70 ? 'chip--info' : 'chip--warn')}">${r.score}% (${r.passed}/${r.total})</span>
+        </td>
+        <td>${r.sigRep ? `<img src="${r.sigRep}" alt="חתימה" style="height:32px; background:#fff; border-radius:4px;">` : '—'}</td>
+        <td><button class="btn btn--sm btn--ghost" data-view="${r.id}">פרטים</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="text-align:center; color: var(--text-low); padding: 22px;">אין ביקורות עדיין.</td></tr>';
+  }
+
+  document.getElementById('inspections-body').addEventListener('click', e => {
+    const id = e.target.dataset.view;
+    if (!id) return;
+    const r = Sanitation.inspections().find(x => x.id === id);
+    if (!r) return;
+    const host = document.createElement('div');
+    host.className = 'modal-host';
+    host.innerHTML = `
+      <div class="modal" style="width: min(560px, 94vw); max-height: 92vh; overflow-y: auto;">
+        <h3 style="margin-top:0;">${util.escapeHtml(r.kitchenName)}</h3>
+        <div style="color: var(--text-mid); font-size: 12px; margin-bottom: 12px;">
+          ${util.escapeHtml(r.tribe)} · ${util.fmtDate(r.ts)} ${util.fmtTime(r.ts)} · ${util.escapeHtml(r.inspector)}
+        </div>
+        <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 12px;">
+          <div style="font-weight: 700; font-size: 22px; color: ${r.score >= 90 ? 'var(--ok)' : (r.score >= 70 ? 'var(--accent)' : 'var(--warn)')}">${r.score}%</div>
+          <div style="font-size: 11px; color: var(--text-mid);">${r.passed} מתוך ${r.total} פריטים עברו</div>
+        </div>
+        <div style="margin-bottom: 12px;">
+          ${(r.checklist || []).map(c => `
+            <div style="display:flex; gap:8px; align-items:center; padding: 4px 0; font-size: 13px;">
+              <span style="color: ${c.pass ? 'var(--ok)' : 'var(--danger)'};">${c.pass ? '✓' : '✕'}</span>
+              <span>${util.escapeHtml(c.label)}</span>
+            </div>
+          `).join('')}
+        </div>
+        ${r.notes ? `<div style="background: rgba(255,181,71,0.06); border: 1px solid rgba(255,181,71,0.3); border-radius: var(--r-sm); padding: 10px; margin-bottom: 12px; font-size: 12px;"><strong>הערות:</strong> ${util.escapeHtml(r.notes)}</div>` : ''}
+        ${r.sigRep ? `<div><div style="font-size:11px;color:var(--text-mid);margin-bottom:4px;">חתימת ${util.escapeHtml(r.repName || 'נציג המטבח')}:</div><img src="${r.sigRep}" alt="חתימה" style="background:#fff; border-radius: var(--r-sm); max-width: 100%;"></div>` : ''}
+        <div style="display:flex; justify-content:flex-end; margin-top: 14px;">
+          <button class="btn btn--primary" data-close>סגור</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(host);
+    host.addEventListener('click', ev => { if (ev.target.closest('[data-close]') || ev.target === host) host.remove(); });
+  });
+
+  // ===== Tab C: Alerts =====
+  document.getElementById('alert-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target;
+    Sanitation.raiseAlert({
+      title: f.title.value.trim(),
+      severity: f.severity.value,
+      location: f.location.value.trim(),
+      details: f.details.value.trim(),
+    });
+    Toast.show('🚨 התראה דחופה נשלחה לחמ"ל', { kind: 'danger' });
+    Scout.Audio.play('pulse-alert');
+    f.reset();
+    renderAlerts();
+  });
+
+  function renderAlerts() {
+    const all = Sanitation.alerts().sort((a, b) => b.ts - a.ts);
+    document.getElementById('alerts-body').innerHTML = all.length ? all.map(a => `
+      <tr>
+        <td style="font-family: var(--font-mono); color: var(--text-low);">${util.fmtTime(a.ts)}</td>
+        <td><strong>${util.escapeHtml(a.title)}</strong>${a.details ? '<br><span style="font-size:11px;color:var(--text-mid);">' + util.escapeHtml(a.details) + '</span>' : ''}</td>
+        <td>${a.severity === 'critical' ? '<span class="chip chip--danger">קריטי</span>' : (a.severity === 'info' ? '<span class="chip">לידיעה</span>' : '<span class="chip chip--warn">דחוף</span>')}</td>
+        <td>${util.escapeHtml(a.location || '—')}</td>
+        <td>${a.status === 'resolved' ? '<span class="chip chip--ok">טופל</span>' : '<span class="chip chip--warn">פתוח</span>'}</td>
+        <td>${a.status !== 'resolved' ? `<button class="btn btn--sm btn--ghost" data-resolve="${a.id}">סמן שטופל</button>` : ''}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="text-align:center; color: var(--text-low); padding: 22px;">אין התראות עדיין.</td></tr>';
+  }
+  document.getElementById('alerts-body').addEventListener('click', e => {
+    const id = e.target.dataset.resolve;
+    if (!id) return;
+    Sanitation.resolveAlert(id);
+    Toast.show('סומן כטופל', { kind: 'ok' });
+    renderAlerts();
+  });
+
+  // ===== Tab D: Camp map (read-only) =====
+  function renderMap() {
+    const map = CampMap.load();
+    const stage = document.getElementById('map-stage');
+    const meta = document.getElementById('map-meta');
+    if (!map.tribes || map.tribes.length === 0) {
+      stage.innerHTML = '<div class="map-empty"><div style="font-size: 36px;">🗺</div><div>מנהל המחנה טרם הציב שבטים על המפה.</div></div>';
+      meta.textContent = 'לא הוגדרו מיקומי שבטים עדיין.';
+      return;
+    }
+    stage.innerHTML = map.tribes.map(t => `
+      <div class="tribe-pin" style="left:${t.x}%; top:${t.y}%; border-color: ${t.color || 'var(--accent)'};">${util.escapeHtml(t.name)}</div>
+    `).join('');
+    meta.textContent = `${map.tribes.length} שבטים · עודכן ${util.fmtTime(map.updatedAt)} ע"י ${util.escapeHtml(map.updatedBy || '—')}`;
+  }
+
+  // Live re-renders
+  Bus.on('sanitation:task', () => { renderCatGrid(); renderTasks(); });
+  Bus.on('sanitation:inspection', () => renderInspections());
+  Bus.on('sanitation:alert', () => renderAlerts());
+  Bus.on('campmap:updated', () => renderMap());
+
+  UI.bindGlobalSOS({ lock: false });
+
+  renderCatGrid();
+  renderTasks();
+  renderInspections();
+  renderAlerts();
+})();
+</script>
+</body>
+</html>
